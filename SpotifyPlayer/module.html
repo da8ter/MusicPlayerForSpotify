@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>/*STYLE*/</style>
+<!-- Font Awesome Light der Visualisierung; icons.js baut die SVGs selbst, deshalb ohne <i>-Ersetzung und DOM-Beobachtung -->
+<script>window.FontAwesomeConfig = { autoReplaceSvg: false, observeMutations: false, autoAddCss: false };</script>
+<script src="/icons.js"></script>
+</head>
+<body>
+<div class="app">
+  <div id="backdrop" class="backdrop"></div>
+  <div id="shade" class="shade"></div>
+  <!-- Aufbau wie die Musik-Apps: breit eine Seitenleiste (iPad), schmal Reiter unten (iPhone) -->
+  <aside id="sidebar" class="sidebar">
+    <div id="sideSearch" class="side-search"></div>
+    <nav id="sideNav" class="side-nav"></nav>
+    <div class="side-foot"><span id="sideBrand" class="brand"></span></div>
+  </aside>
+  <main class="main">
+    <div id="topSearch" class="top-search">
+      <label id="searchWrap" class="search-wrap"><input id="q" class="search" type="search" autocomplete="off"></label>
+    </div>
+    <div id="panel" class="panel"></div>
+  </main>
+  <!-- Mini-Player über den Reitern; ein Tipp öffnet „Läuft gerade“ -->
+  <div id="mini" class="mini" role="button">
+    <span id="miniCover" class="mini-cover"></span>
+    <span class="mini-txt"><b id="miniTitle"></b><small id="miniSub"></small></span>
+    <button id="miniPlay" class="mini-btn"></button>
+    <button id="miniNext" class="mini-btn"></button>
+  </div>
+  <div id="tabdock" class="tabdock">
+    <nav id="tabs" class="tabnav"></nav>
+    <button id="tabSearch" class="tab-search"></button>
+  </div>
+  <!-- Läuft gerade (Vollansicht) -->
+  <section id="np" class="np" aria-hidden="true">
+    <div id="npBackdrop" class="np-backdrop"></div>
+    <div class="np-body">
+      <button id="npClose" class="np-close"></button>
+      <div class="np-art"><div id="cover" class="np-cover"></div></div>
+      <div id="queue" class="np-queue"><div id="queueHead" class="queue-head"></div><div id="queueList" class="queue-list"></div></div>
+      <div class="np-controls">
+        <div class="np-meta">
+          <div class="meta"><div id="title" class="title"></div><div id="subtitle" class="subtitle"></div></div>
+          <button id="bLove" class="love" hidden></button>
+          <button id="bMore" class="more np-more" hidden></button>
+        </div>
+        <div class="progress"><input id="seek" type="range" min="0" max="1000" value="0"><div class="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div></div>
+        <div class="controls">
+          <button id="bPrev"></button>
+          <button id="bPlay"></button>
+          <button id="bNext"></button>
+        </div>
+        <div class="volume"><span id="volIcon"></span><input id="volume" type="range" min="0" max="100" value="50"></div>
+        <div class="np-tools"><button id="bDevices" class="np-tool"><span id="deviceIcon"></span><span id="deviceName" class="device-name"></span></button><button id="bQueue" class="np-tool"></button><span id="npBrand" class="brand np-brand"></span></div>
+      </div>
+    </div>
+  </section>
+  <div id="login" class="overlay" hidden><p id="loginText"></p><button id="bLogin" class="primary"></button></div>
+  <div id="notice" class="notice" hidden></div>
+</div>
+<div id="sheet" class="sheet" hidden></div>
+<script>window.SPM_CONFIG = /*CONFIG*/null;</script>
+<script>/*CORE*/</script>
+<script>/*ICONS*/</script>
+<script>/*NAV*/</script>
+<script>/*ACTIONS*/</script>
+<script>/*UI*/</script>
+<script>/*DETAILS*/</script>
+<script>/*VIEWS*/</script>
+<script>/*PLAYER*/</script>
+<script>/*SCROLL*/</script>
+<script>window.AMP.start();</script>
+</body>
+</html>

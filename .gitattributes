@@ -1,0 +1,3 @@
+# Nicht in Module Store und Archive: Projektgedächtnis und Tests
+/.claude export-ignore
+/tests export-ignore

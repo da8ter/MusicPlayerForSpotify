@@ -1,0 +1,292 @@
+/* Farben aus dem Symcon-Thema: die Visu stellt --card-color, --content-color und --accent-color
+   bereit, alles Weitere leitet sich davon ab (wie in den SymDo-Kacheln). Hell und Dunkel
+   kommen damit von Symcon, nicht vom Betriebssystem. Die Vorgaben gelten nur außerhalb der Visu.
+   Aufbau (Seitenleiste, Reiter, Mini-Player, „Läuft gerade“) steht in layout.css. */
+:root {
+  --text: var(--content-color, #1d1d1f);
+  --muted: color-mix(in srgb, var(--content-color, #1d1d1f) 55%, transparent);
+  --accent: var(--accent-color, #00cdab);
+  --surface: color-mix(in srgb, var(--content-color, #1d1d1f) 7%, transparent);
+  --line: color-mix(in srgb, var(--content-color, #1d1d1f) 14%, transparent);
+  --sbw: 6px; /* Balkenbreite, zur Laufzeit gemessen (scroll.js) */
+  --glass-bg: color-mix(in srgb, var(--card-color, #fff) 35%, transparent);
+  --glass-blur: blur(14.4px) saturate(180%);
+  /* Rechter Innenabstand, der den Balken mittig in den marginside-Streifen legt */
+  --sb-pad: max(0px, calc((var(--marginside, 12px) - var(--sbw)) / 2));
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  /* Rand und Polster, die die Visu am body setzt, neutralisieren: die Ränder kommen aus margin* */
+  margin: 0 !important; padding: 0 !important;
+  font: 14px/1.35 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: transparent;
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+/* Font-Awesome-Symbole (icons.js): Farbe aus currentColor */
+.fa-icon { flex: none; width: 1em; height: 1em; overflow: visible; }
+.tab-icon { width: 18px; height: 18px; }
+
+/* Cover des geöffneten Albums bzw. der Playlist als Hintergrund des Inhalts: über die ganze
+   Inhaltsbreite, nach unten ins Transparente auslaufend. Lage und Höhe setzt ui.js. */
+.backdrop {
+  position: fixed; top: 0; left: var(--backdrop-left, 0px); right: 0; z-index: 0;
+  height: var(--backdrop-h, 260px);
+  background: center top / 100% auto no-repeat;
+  opacity: 0; transition: opacity .4s;
+  pointer-events: none;
+  --fade-end: min(var(--backdrop-h, 260px), var(--cover-h, 100vw));
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(var(--fade-end) * .45), transparent var(--fade-end));
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(var(--fade-end) * .45), transparent var(--fade-end));
+}
+/* Unschärfe von links nach rechts: eine unscharfe Kopie des Covers (erbt das Hintergrundbild),
+   links voll sichtbar, nach rechts ausgeblendet. Etwas größer als die Fläche, damit der
+   Unschärferand nicht durchscheint; die Maske des .backdrop schneidet es wieder ab. */
+.backdrop::before {
+  content: ''; position: absolute; inset: -40px;
+  background: inherit; filter: blur(22px);
+  background-position: 40px 40px; background-size: calc(100% - 80px) auto;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 15%, transparent 85%);
+  mask-image: linear-gradient(to right, #000 0%, #000 15%, transparent 85%);
+}
+body.has-cover .backdrop { opacity: 1; }
+/* Kachel in der Hauptfarbe des Covers (Apples artwork.bgColor); darüber Cover und Abdunklung */
+html, body { transition: background-color .6s; }
+/* !important: falls die Visu den Hintergrund der Kachelseite selbst setzt */
+html.has-cover, html.has-cover body { background-color: var(--cover-color, transparent) !important; }
+/* Mit Cover: die ganze Kachel gleichmäßig abdunkeln; der ganze Inhalt ist dann hell beschriftet. */
+.shade {
+  position: fixed; inset: 0; z-index: 0;
+  background: rgba(0, 0, 0, .55); pointer-events: none; opacity: 0; transition: opacity .4s;
+}
+body.has-cover .shade { opacity: 1; }
+body.has-cover .app {
+  --text: #fff; --muted: rgba(255, 255, 255, .72);
+  --surface: rgba(255, 255, 255, .12); --line: rgba(255, 255, 255, .2);
+  --glass-bg: rgba(0, 0, 0, .35);
+  color: var(--text);
+}
+
+/* Eigene, randlose Schieberegler: die eingebaute Leiste zeichnet in Chrome eine helle Randlinie.
+   Der gefüllte Teil kommt aus --fill (player.js), Firefox malt ihn selbst (::-moz-range-progress). */
+input[type=range] {
+  flex: 1; min-width: 0; width: 100%; height: 18px; margin: 0;
+  -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+}
+input[type=range]:focus, input[type=range]:focus-visible { outline: none; }
+input[type=range]::-webkit-slider-runnable-track {
+  height: 4px; border: 0; border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--fill, 0%), color-mix(in srgb, var(--text) 25%, transparent) var(--fill, 0%));
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -5px;
+  border: 0; border-radius: 50%; background: var(--accent);
+}
+input[type=range]::-moz-range-track { height: 4px; border: 0; border-radius: 2px; background: color-mix(in srgb, var(--text) 25%, transparent); }
+input[type=range]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--accent); }
+
+/* Menü-Popover (Vorlage: .menu-pop der SymDo-Web-App) */
+.menu-pop {
+  position: fixed; z-index: 70; min-width: 230px;
+  /* Glas wie die Reiterleiste: halb durchsichtig, Hintergrund verschwommen */
+  background: color-mix(in srgb, var(--card-color, #fff) 62%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+  color: var(--content-color, #1d1d1f);
+  border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .35);
+  overflow: hidden; display: none;
+}
+.menu-pop.open { display: block; }
+.menu-pop button {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 11px 14px; font-size: 14.5px; white-space: normal; word-break: break-word;
+}
+.menu-pop button:active { background: var(--surface); }
+.menu-pop button .check { margin-left: auto; width: 15px; height: 15px; color: var(--accent); }
+
+/* Suchfeld im Kacheldesign: abgedunkelt, 1 px Rand in Akzentfarbe, Lupe und Löschen-X in Akzentfarbe */
+.search-wrap { position: relative; display: flex; flex: 1; min-width: 0; }
+/* Lupe als ::after VOR dem Feld (Maske aus icons.js), sonst verwischt dessen backdrop-filter sie */
+.search-wrap::after {
+  content: ''; position: absolute; z-index: 1; left: 11px; top: 50%; width: 15px; height: 15px; transform: translateY(-50%);
+  background: var(--accent); pointer-events: none;
+  -webkit-mask: var(--icon-search) center / contain no-repeat;
+  mask: var(--icon-search) center / contain no-repeat;
+}
+.search {
+  flex: 1; min-width: 0; font: inherit; color: inherit; padding: 8px 11px 8px 34px; border: 1px solid var(--accent); border-radius: 12px;
+  background: rgba(0, 0, 0, .25); outline: none; -webkit-appearance: none; appearance: none;
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.search:focus, .search:focus-visible { outline: none; box-shadow: none; }
+.search::placeholder { color: var(--muted); }
+.search::-webkit-search-cancel-button {
+  -webkit-appearance: none; appearance: none; width: 14px; height: 14px; cursor: pointer;
+  background: var(--accent);
+  -webkit-mask: var(--icon-clear) center / contain no-repeat;
+  mask: var(--icon-clear) center / contain no-repeat;
+}
+
+/* Scrollbereiche: Balken in Akzentfarbe (Inhalt, Seitenleiste, Warteschlange) */
+.panel, .side-nav, .queue-list { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.panel::-webkit-scrollbar, .side-nav::-webkit-scrollbar, .queue-list::-webkit-scrollbar { width: 6px; }
+.panel::-webkit-scrollbar-track, .panel::-webkit-scrollbar-corner,
+.side-nav::-webkit-scrollbar-track, .queue-list::-webkit-scrollbar-track { background: transparent; }
+.panel::-webkit-scrollbar-thumb, .side-nav::-webkit-scrollbar-thumb, .queue-list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 999px;
+}
+/* Standard und ::-webkit-scrollbar schließen sich aus: der Standard nur, wo es die Pseudoelemente nicht gibt */
+@supports not selector(::-webkit-scrollbar) {
+  .panel, .side-nav, .queue-list { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent) 70%, transparent) transparent; }
+}
+
+/* Seiten wie in der Musik-App: großer Titel, fette Abschnittsüberschriften */
+.page-title { font-size: 28px; line-height: 1.15; font-weight: 700; margin: 4px 4px 6px; }
+.panel h3 { font-size: 18px; font-weight: 700; margin: 18px 4px 8px; }
+.panel h3:first-child, .page-title + h3 { margin-top: 8px; }
+
+/* Kategorien der Mediathek */
+.categories { display: flex; flex-direction: column; margin: 0 4px 6px; }
+.category {
+  display: flex; align-items: center; gap: 14px; padding: 11px 2px; text-align: left;
+  font-size: 17px; border-bottom: 1px solid var(--line);
+}
+.category span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-icon { width: 21px; height: 21px; color: var(--accent); }
+.cat-chevron { width: 12px; height: 12px; color: var(--muted); }
+
+.row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 4px; border-radius: 8px; text-align: left; }
+.row:hover { background: var(--surface); }
+.thumb { position: relative; flex: none; width: 44px; height: 44px; border-radius: 6px; background: var(--surface) center / cover no-repeat; }
+/* Play-Symbol auf dem Cover beim Darüberfahren (ein Klick aufs Cover spielt); nur mit Maus,
+   auf Touch-Geräten bliebe es sonst nach dem Tippen stehen */
+@media (hover: hover) {
+  .thumb::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; opacity: 0; transition: opacity .15s;
+    background: rgba(0, 0, 0, .45) var(--icon-play-white) center / 18px no-repeat;
+  }
+  .thumb:hover::after { opacity: 1; }
+  .thumb.playing::after { background-image: var(--icon-stop-white); }
+}
+.thumb.noplay::after { display: none; }
+.thumb.round, .album-art.round { border-radius: 50%; }
+.txt { min-width: 0; display: flex; flex-direction: column; }
+.txt b, .txt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.txt b { font-weight: 500; }
+.txt small { color: var(--muted); font-size: 12px; }
+.row .txt { flex: 1; }
+.empty { color: var(--muted); padding: 12px 4px; }
+.back { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); padding: 6px 4px; font-weight: 600; }
+.back svg { width: 13px; height: 13px; }
+
+/* Kacheln: Raster (Alben, zuletzt hinzugefügt) und waagerechte Regale (Start, Neu, Radio) */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px 12px; padding: 4px 4px 12px; }
+.shelf {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 150px; gap: 12px;
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+  padding: 0 4px 8px; scrollbar-width: none;
+}
+.shelf::-webkit-scrollbar { display: none; }
+.card { display: flex; flex-direction: column; gap: 6px; min-width: 0; scroll-snap-align: start; }
+.card-art.thumb { width: 100%; height: auto; aspect-ratio: 1; border-radius: 10px; cursor: pointer; }
+.card-art.thumb.round { border-radius: 50%; }
+.card-txt { display: flex; flex-direction: column; text-align: left; min-width: 0; padding: 0 2px; }
+.card-txt b, .card-txt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-txt b { font-weight: 500; font-size: 13px; }
+.card-txt small { color: var(--muted); font-size: 12px; }
+
+/* Album bzw. Playlist mit Trackliste */
+/* Detailseiten (Album, Playlist, Künstler; Klasse detail aus details.js): alles auf einer Linie mit
+   gemeinsamem, etwas größerem Abstand nach links */
+.panel.detail { --inset: 18px; }
+.panel.detail > .back, .panel.detail .album-head, .panel.detail .row, .panel.detail .grid, .panel.detail .empty { padding-left: var(--inset); }
+.panel.detail h3 { margin-left: var(--inset); }
+@media (max-width: 520px) { .panel.detail { --inset: 10px; } }
+.album-head { display: flex; gap: 14px; align-items: flex-start; padding: 6px 4px 12px; }
+/* Oberkante des Covers bündig mit der Oberkante des Titels (Zeilenabstand oben ausgleichen) */
+.album-head .txt b { line-height: 1.2; margin-top: -2px; font-size: 17px; font-weight: 600; white-space: normal; }
+.album-art { flex: none; width: 110px; height: 110px; border-radius: 10px; background: var(--surface) center / cover no-repeat; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+.album-actions { --pill-h: calc(14px * 1.35 + 18px); display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+/* „⋯“ neben dem Abspielen-Knopf genauso hoch wie dieser */
+.album-actions .more { width: var(--pill-h); height: var(--pill-h); }
+.album-actions .play-icon { display: none; width: 18px; height: 18px; }
+/* Smartphone: Album-Cover 30 % kleiner, „Abspielen“ nur als runder Knopf mit Play-Symbol */
+@media (max-width: 520px) {
+  .album-art { width: 77px; height: 77px; }
+  .album-actions { --pill-h: 33px; }
+  .album-actions .primary { width: var(--pill-h); height: var(--pill-h); padding: 0; border-radius: 50%; display: grid; place-items: center; }
+  .album-actions .primary .label { display: none; }
+  .album-actions .play-icon { display: block; width: 16px; height: 16px; margin-left: 2px; }
+}
+/* „⋯“ immer als runder, abgedunkelt grauer Knopf */
+.more { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--text); background: var(--surface); font-size: 16px; line-height: 1; }
+.more svg { width: 16px; height: 16px; }
+.more:hover { background: color-mix(in srgb, var(--text) 16%, transparent); }
+.row.track { gap: 12px; }
+/* Nummern linksbündig: sie fluchten mit Cover und „Zurück“ darüber */
+.row.track .num { flex: none; width: 22px; text-align: left; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+.row.track .txt { flex: 1; }
+/* Laufender Track: Play-Symbol in Akzentfarbe statt der Nummer */
+.row.track.now .num { color: transparent; position: relative; }
+.row.track.now .num::after {
+  content: ''; position: absolute; left: 0; top: 50%; width: 14px; height: 14px; transform: translateY(-50%);
+  background: var(--accent);
+  -webkit-mask: var(--icon-play) center / contain no-repeat;
+  mask: var(--icon-play) center / contain no-repeat;
+}
+.row.track.now b { color: var(--accent); }
+.row.track .dur { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* Blatt von unten (Aktionen, Playlist-Auswahl) in den Farben des Symcon-Themas */
+.sheet {
+  position: fixed; inset: 0; z-index: 10; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0, 0, 0, .3); padding: var(--margintop, 12px) var(--marginside, 12px) var(--marginbottom, 12px);
+}
+.sheet-box {
+  width: 100%; max-width: 480px; max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 16px;
+  /* Glas: halb durchsichtig, Hintergrund verschwommen */
+  background: color-mix(in srgb, var(--card-color, #fff) 62%, transparent); color: var(--content-color, #1d1d1f);
+  -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid color-mix(in srgb, var(--content-color, #1d1d1f) 12%, transparent);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .35);
+}
+.sheet-title { font-weight: 700; padding: 4px 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet-item { padding: 12px; border-radius: 12px; font-weight: 700; text-align: left; background: color-mix(in srgb, var(--content-color, #1d1d1f) 9%, transparent); }
+.sheet-item:disabled { opacity: .4; }
+.sheet-cancel { text-align: center; margin-top: 4px; color: var(--accent); }
+/* Geräteauswahl (Spotify Connect) */
+.sheet-item.device { display: flex; align-items: center; gap: 12px; }
+.sheet-item.device svg { width: 20px; height: 20px; }
+.sheet-item.device span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-item.device.active { color: var(--accent); }
+.sheet-item.device .check { width: 15px; height: 15px; }
+.sheet-list { display: flex; flex-direction: column; gap: 6px; }
+.sheet-new { display: flex; gap: 6px; }
+.sheet-new input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 12px; color: inherit;
+  border: 1px solid color-mix(in srgb, var(--content-color, #1d1d1f) 14%, transparent); background: transparent; }
+
+.notice {
+  position: fixed; z-index: 9; left: 12px; right: 12px; bottom: calc(var(--marginbottom, 12px) + 4px);
+  padding: 8px 12px; border-radius: 10px; background: rgba(40, 40, 40, .92); color: #fff; font-size: 13px;
+}
+.overlay {
+  /* Über Inhalt, Reitern und Player, sonst ist der Knopf nicht klickbar */
+  position: absolute; z-index: 9; inset: var(--margintop, 12px) var(--marginside, 12px) var(--marginbottom, 12px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  text-align: center; border-radius: 12px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  background: rgba(128, 128, 128, .18);
+}
+.primary { padding: 9px 18px; border-radius: 20px; background: var(--accent); color: #fff; font-weight: 600; }
+[hidden] { display: none !important; }
+
+/* iOS zoomt die Seite heran, sobald ein Eingabefeld mit Schrift unter 16 px den Fokus bekommt */
+.search, .sheet-new input { font-size: 16px; }
+
+/* Embed-Player ohne Developer-Token */
+.embed { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; margin-right: calc(var(--sb-pad) + var(--sbw)); }
+.embed select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: inherit; }
+.embed iframe { flex: 1; width: 100%; border: 0; border-radius: 12px; min-height: 150px; }
