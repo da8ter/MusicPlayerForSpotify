@@ -1,4 +1,4 @@
-/* Musikplayer für Apple Music – untere Reiterleiste und „Mehr“-Menü, übernommen aus der
+/* Musikplayer für Spotify – untere Reiterleiste und „Mehr“-Menü, übernommen aus der
    SymDo-Web-App (tabLeisteAnpassen, openMenu): schwebende Glas-Kapsel, Symbol über Beschriftung.
    Die Leiste passt sich in drei Stufen dem Platz an, jede erst, wenn die vorige nicht reicht:
    1. Symbol und Beschriftung – so breit wie ihr Inhalt, mindestens die halbe, höchstens die Inhaltsbreite.
