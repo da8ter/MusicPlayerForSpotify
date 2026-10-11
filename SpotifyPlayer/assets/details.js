@@ -147,12 +147,13 @@
     list.innerHTML = '<p class="empty">' + esc(T('Loading…')) + '</p>';
     panel.appendChild(list);
     (async () => {
-      const path = kind === 'album' ? '/v1/albums/' + encodeURIComponent(id) + '/tracks' : '/v1/playlists/' + encodeURIComponent(id) + '/tracks';
-      const params = kind === 'album' ? { limit: 50, market: 'from_token' } : { limit: 100, market: 'from_token', additional_types: 'track', fields: 'next,items(track(id,uri,name,type,duration_ms,track_number,artists(name)))' };
+      // Playlist-Inhalte (/items, seit Februar 2026) gibt Spotify nur für eigene und gemeinsame Playlists frei
+      const path = kind === 'album' ? '/v1/albums/' + encodeURIComponent(id) + '/tracks' : '/v1/playlists/' + encodeURIComponent(id) + '/items';
+      const params = kind === 'album' ? { limit: 50, market: 'from_token' } : { limit: 50, market: 'from_token', additional_types: 'track', fields: 'next,items(item(id,uri,name,type,duration_ms,track_number,artists(name)))' };
       const items = await AMP.apiAll(path, params, 1000);
       list.innerHTML = '';
       items.forEach((entry, index) => {
-        const t = kind === 'album' ? entry : entry && entry.track;
+        const t = kind === 'album' ? entry : entry && entry.item;
         if (!t || !t.id || t.type === 'episode') return;
         const row = document.createElement('button');
         row.className = 'row track';

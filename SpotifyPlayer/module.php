@@ -137,8 +137,10 @@ class MusicPlayerForSpotify extends IPSModuleStrict
                     : $this->Translate('No Connect address found: enter the public base address (https) above');
             }
             if (($action['name'] ?? '') === 'LoginInfo') {
+                // Die Abo-Art (product) liefert Spotify Dev-Mode-Apps seit Februar 2026 nicht mehr
+                $product = $this->ReadAttributeString('Product');
                 $action['caption'] = $this->SignedIn()
-                    ? sprintf($this->Translate('Signed in to Spotify as %s (%s)'), $this->ReadAttributeString('UserName'), $this->ReadAttributeString('Product'))
+                    ? sprintf($this->Translate('Signed in to Spotify as %s'), $this->ReadAttributeString('UserName') . ($product !== '' ? ' (' . $product . ')' : ''))
                     : $this->Translate('Not signed in to Spotify');
             }
         }

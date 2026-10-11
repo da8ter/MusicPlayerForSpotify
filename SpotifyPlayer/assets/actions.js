@@ -1,5 +1,6 @@
 /* Musikplayer für Spotify – Aktionen an Titeln, Alben, Playlists und Künstlern: Warteschlange,
-   Playlists (anlegen, befüllen, umbenennen, Titel entfernen, löschen), Mediathek, Folgen, Favoriten. */
+   Playlists (anlegen, befüllen, umbenennen, Titel entfernen, löschen), Mediathek, Folgen, Favoriten.
+   Endpunkte nach Spotifys Dev-Mode-Umstellung vom Februar 2026: /me/library (URIs), /playlists/{id}/items. */
 (function () {
   'use strict';
   const AMP = window.AMP;
@@ -48,7 +49,7 @@
   async function urisOf(ref) {
     if (ref.type === 'track') return [ref.uri];
     if (ref.type === 'album') return (await AMP.apiAll('/v1/albums/' + enc(ref.id) + '/tracks', { limit: 50 }, 500)).map(t => t.uri);
-    if (ref.type === 'playlist') return (await AMP.apiAll('/v1/playlists/' + enc(ref.id) + '/tracks', { limit: 100, fields: 'next,items(track(uri,type))' }, 500)).map(i => i.track && i.track.type === 'track' ? i.track.uri : '').filter(Boolean);
+    if (ref.type === 'playlist') return (await AMP.apiAll('/v1/playlists/' + enc(ref.id) + '/items', { limit: 50, fields: 'next,items(item(uri,type))' }, 500)).map(i => i.item && i.item.type === 'track' ? i.item.uri : '').filter(Boolean);
     return [];
   }
 
@@ -78,8 +79,8 @@
         if (!name) { input.focus(); return; }
         close();
         try {
-          const playlist = await write('POST', '/v1/users/' + enc(AMP.cfg.userId) + '/playlists', {}, { name, public: false });
-          await write('POST', '/v1/playlists/' + enc(playlist.id) + '/tracks', {}, { uris: (await urisOf(ref)).slice(0, 100) });
+          const playlist = await write('POST', '/v1/me/playlists', {}, { name, public: false });
+          await write('POST', '/v1/playlists/' + enc(playlist.id) + '/items', {}, { uris: (await urisOf(ref)).slice(0, 100) });
           AMP.notify(T('Playlist created') + ': ' + name);
         } catch (e) { AMP.notify(T('Could not change the playlist')); }
       }, 'primary'));
@@ -96,7 +97,7 @@
           list.appendChild(button(p.name || '', async () => {
             close();
             try {
-              await write('POST', '/v1/playlists/' + enc(p.id) + '/tracks', {}, { uris: (await urisOf(ref)).slice(0, 100) });
+              await write('POST', '/v1/playlists/' + enc(p.id) + '/items', {}, { uris: (await urisOf(ref)).slice(0, 100) });
               AMP.notify(T('Added to') + ' „' + (p.name || '') + '“');
             } catch (e) { AMP.notify(T('Could not change the playlist')); }
           }));
@@ -105,23 +106,16 @@
     });
   }
 
-  // ── Mediathek: gespeichert (Titel, Alben), gefolgt (Künstler, Playlists) ──
-  // null: unbekannt (die contains-Abfragen bekommen neue Apps nicht, HTTP 403)
+  // ── Mediathek (gespeicherte Titel und Alben, gefolgte Künstler und Playlists): /me/library mit URIs ──
+  // null: unbekannt (Abfrage fehlgeschlagen)
   async function inLibrary(ref) {
     try {
-      if (ref.type === 'track') return (await AMP.call('GET', '/v1/me/tracks/contains', { ids: ref.id }))[0] === true;
-      if (ref.type === 'album') return (await AMP.call('GET', '/v1/me/albums/contains', { ids: ref.id }))[0] === true;
-      if (ref.type === 'artist') return (await AMP.call('GET', '/v1/me/following/contains', { type: 'artist', ids: ref.id }))[0] === true;
-      if (ref.type === 'playlist') return (await AMP.call('GET', '/v1/playlists/' + enc(ref.id) + '/followers/contains', { ids: AMP.cfg.userId }))[0] === true;
+      return (await AMP.call('GET', '/v1/me/library/contains', { uris: ref.uri }))[0] === true;
     } catch (e) { /* unbekannt */ }
     return null;
   }
   function setLibrary(ref, on) {
-    const method = on ? 'PUT' : 'DELETE';
-    if (ref.type === 'track') return write(method, '/v1/me/tracks', { ids: ref.id });
-    if (ref.type === 'album') return write(method, '/v1/me/albums', { ids: ref.id });
-    if (ref.type === 'artist') return write(method, '/v1/me/following', { type: 'artist', ids: ref.id });
-    return write(method, '/v1/playlists/' + enc(ref.id) + '/followers', {});
+    return write(on ? 'PUT' : 'DELETE', '/v1/me/library', { uris: ref.uri });
   }
   const LIBRARY_LABELS = {
     track: ['Like', 'Remove like', 'Added to library', 'Removed from library'],
@@ -177,10 +171,11 @@
       box.appendChild(form);
     });
   }
+  // Löschen heißt bei Spotify: der Playlist nicht mehr folgen
   async function deletePlaylist(ref) {
     close();
     try {
-      await write('DELETE', '/v1/playlists/' + enc(ref.id) + '/followers', {});
+      await write('DELETE', '/v1/me/library', { uris: ref.uri });
       AMP.notify(T('Playlist deleted'));
       window.AMPUI.select('playlists');
     } catch (e) { AMP.notify(T('Could not change the playlist')); }
@@ -188,7 +183,7 @@
   async function removeFromPlaylist(ref) {
     close();
     try {
-      await write('DELETE', '/v1/playlists/' + enc(ref.inPlaylist.id) + '/tracks', {}, { tracks: [{ uri: ref.uri }] });
+      await write('DELETE', '/v1/playlists/' + enc(ref.inPlaylist.id) + '/items', {}, { items: [{ uri: ref.uri }] });
       AMP.notify(T('Removed from playlist'));
       document.querySelectorAll('.row.track[data-track="' + ref.id + '"]').forEach(row => row.remove());
     } catch (e) { AMP.notify(T('Could not change the playlist')); }

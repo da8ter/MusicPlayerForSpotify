@@ -21,7 +21,7 @@
             "Not signed in to Spotify (open the tile and sign in)": "Nicht bei Spotify angemeldet (Kachel öffnen und anmelden)",
             "Redirect URI for the Spotify app: %s": "Redirect-URI für die Spotify-App: %s",
             "No Connect address found: enter the public base address (https) above": "Keine Connect-Adresse gefunden: oben die öffentliche Basisadresse (https) eintragen",
-            "Signed in to Spotify as %s (%s)": "Bei Spotify angemeldet als %s (%s)",
+            "Signed in to Spotify as %s": "Bei Spotify angemeldet als %s",
             "Signed in to Spotify. You can close this window.": "Bei Spotify angemeldet. Dieses Fenster kann geschlossen werden.",
             "Sign-in rejected: unknown or expired request": "Anmeldung abgelehnt: unbekannte oder abgelaufene Anfrage",
             "Sign-in failed": "Anmeldung fehlgeschlagen",

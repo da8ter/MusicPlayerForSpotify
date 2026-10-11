@@ -6,7 +6,7 @@ Spielt Spotify direkt in der Symcon-Kachelvisualisierung und steuert jedes Spoti
 
 - Symcon ab 8.1 mit Kachelvisualisierung und einer **Connect-Adresse** (https), denn Spotify erlaubt den Rückruf der Anmeldung nur über https. Alternativ eine eigene öffentliche https-Adresse.
 - **Spotify Premium**: Ohne Premium lässt Spotify weder die Wiedergabe in der Kachel noch die Steuerung von Geräten zu. Mediathek und Suche gehen auch ohne.
-- Eine **eigene App bei Spotify** (kostenlos): Unter https://developer.spotify.com/dashboard anmelden, *Create app*, einen Namen vergeben, als Redirect URI die Adresse aus dem Instanzformular eintragen (`https://<Connect-Adresse>/hook/spotifyplayer`), bei den APIs *Web API* und *Web Playback SDK* anhaken. Die **Client ID** aus den App-Einstellungen kommt in die Instanz. Spotify lässt solche Apps im Development Mode mit bis zu 25 Nutzern laufen; weitere Konten müssen in der App unter *User Management* eingetragen werden.
+- Eine **eigene App bei Spotify** (kostenlos): Unter https://developer.spotify.com/dashboard anmelden, *Create app*, einen Namen vergeben, als Redirect URI die Adresse aus dem Instanzformular eintragen (`https://<Connect-Adresse>/hook/spotifyplayer`), bei den APIs *Web API* und *Web Playback SDK* anhaken. Die **Client ID** aus den App-Einstellungen kommt in die Instanz. Spotify lässt solche Apps im Development Mode mit **bis zu 5 Nutzern** laufen; weitere Konten müssen in der App unter *User Management* eingetragen werden. Der Inhaber der App braucht selbst Spotify Premium, und je Entwicklerkonto sind 25 Apps erlaubt.
 
 ## Wo die Musik spielt
 
@@ -61,7 +61,7 @@ Alle Funktionen geben `false` zurück und schreiben ins Log, wenn kein Gerät er
 ## Grenzen
 
 - Spotify stellt neue Titel nur hinten an die Warteschlange; „Als Nächstes“ gibt es in der Web API nicht. Die Warteschlange lässt sich anzeigen, aber nicht umsortieren.
-- Spotify gibt Apps im Development Mode einiges nicht mehr frei (HTTP 403): Neuerscheinungen und andere Browse-Inhalte, Empfehlungen, ähnliche Künstler, die Top-Titel eines Künstlers sowie die Titel fremder und redaktioneller Playlists. „Start“ und „Neu“ bauen deshalb auf deiner Mediathek und deinen Künstlern auf, die Künstlerseite holt Titel über die Suche, und bei gesperrten Playlists steht ein Hinweis. Ob ein Titel, Album oder Künstler schon in der Mediathek ist, lässt sich ebenfalls nicht abfragen; das Menü bietet dann Hinzufügen und Entfernen an. Suche und Künstleralben liefert Spotify nur in Zehnerschritten.
+- Seit Spotifys Umstellung für Apps im Development Mode (Februar 2026, bestehende Apps ab 9. März 2026) gibt es für solche Apps keine Neuerscheinungen, Browse-Kategorien, Empfehlungen, ähnlichen Künstler und Top-Titel eines Künstlers mehr; Playlist-Inhalte liefert Spotify nur für eigene und gemeinsame Playlists. „Start“ und „Neu“ bauen deshalb auf deiner Mediathek und deinen Künstlern auf, die Künstlerseite holt Titel über die Suche, und bei fremden Playlists steht ein Hinweis. Suche und Künstleralben liefert Spotify nur in Zehnerschritten, das Modul blättert selbst nach.
 - Das Access-Token ist in der Kachel sichtbar. Wer die Visualisierung öffnen darf, kann damit das Spotify-Konto bedienen, so wie über die Kachel selbst.
 
 ## Nutzungsbedingungen und Datenschutz
