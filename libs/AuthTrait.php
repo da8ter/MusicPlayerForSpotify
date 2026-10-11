@@ -230,6 +230,9 @@ trait MusicPlayerSpotifyAuthTrait
         ];
         if ($Body !== null) {
             $options[CURLOPT_POSTFIELDS] = $Body;
+        } elseif ($Method !== 'GET') {
+            // PUT/POST ohne Rumpf: Spotify antwortet sonst mit HTTP 411 (Length Required)
+            $options[CURLOPT_HTTPHEADER][] = 'Content-Length: 0';
         }
         curl_setopt_array($ch, $options);
         if (defined('CURLOPT_PROTOCOLS_STR')) {
