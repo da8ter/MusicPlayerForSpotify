@@ -92,12 +92,20 @@
     panel.appendChild(list);
     (async () => {
       const base = '/v1/artists/' + encodeURIComponent(id);
+      // Top-Titel bekommen neue Apps nicht mehr (HTTP 403): dann die Suche nach Titeln des Künstlers
+      const topTracks = async () => {
+        try { return (await AMP.api(base + '/top-tracks', { market: 'from_token' })).tracks || []; } catch (e) { /* Rückfall */ }
+        const name = resource.name || (await AMP.api(base).catch(() => ({}))).name || '';
+        if (!name) return [];
+        const found = await AMP.api('/v1/search', { q: 'artist:"' + name.replace(/"/g, '') + '"', type: 'track', limit: 20, market: 'from_token' }).catch(() => ({}));
+        return ((found.tracks && found.tracks.items) || []).filter(t => t && (t.artists || []).some(a => a.id === id));
+      };
       const [top, albums] = await Promise.all([
-        AMP.api(base + '/top-tracks', { market: 'from_token' }).catch(() => ({ tracks: [] })),
+        topTracks(),
         AMP.api(base + '/albums', { include_groups: 'album,single', limit: 50, market: 'from_token' }).catch(() => ({ items: [] })),
       ]);
       list.innerHTML = '';
-      const tracks = (top.tracks || []).slice(0, 10);
+      const tracks = top.slice(0, 10);
       if (tracks.length) {
         const h = document.createElement('h3');
         h.textContent = T('Top songs');
@@ -161,7 +169,10 @@
       });
       if (!list.children.length) list.innerHTML = '<p class="empty">' + esc(T('No results')) + '</p>';
       markPlaying();
-    })().catch(() => { list.innerHTML = '<p class="empty">' + esc(T('No results')) + '</p>'; });
+    })().catch(e => {
+      // Fremde und redaktionelle Playlists gibt Spotify neuen Apps nicht frei (HTTP 403)
+      list.innerHTML = '<p class="empty">' + esc(T(e && e.status === 403 ? 'Spotify does not share this content with this app' : 'No results')) + '</p>';
+    });
   }
 
   // Album des laufenden Titels öffnen (Klick auf Titel in „Läuft gerade“)

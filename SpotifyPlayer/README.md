@@ -61,7 +61,7 @@ Alle Funktionen geben `false` zurück und schreiben ins Log, wenn kein Gerät er
 ## Grenzen
 
 - Spotify stellt neue Titel nur hinten an die Warteschlange; „Als Nächstes“ gibt es in der Web API nicht. Die Warteschlange lässt sich anzeigen, aber nicht umsortieren.
-- Empfehlungen, ähnliche Künstler und redaktionelle Playlists stellt Spotify neuen Apps seit November 2024 nicht mehr bereit; „Start“ zeigt deshalb Hörverlauf, Top-Listen und Neuerscheinungen.
+- Spotify gibt Apps im Development Mode einiges nicht mehr frei (HTTP 403): Neuerscheinungen und andere Browse-Inhalte, Empfehlungen, ähnliche Künstler, die Top-Titel eines Künstlers sowie die Titel fremder und redaktioneller Playlists. „Start“ und „Neu“ bauen deshalb auf deiner Mediathek und deinen Künstlern auf, die Künstlerseite holt Titel über die Suche, und bei gesperrten Playlists steht ein Hinweis.
 - Das Access-Token ist in der Kachel sichtbar. Wer die Visualisierung öffnen darf, kann damit das Spotify-Konto bedienen, so wie über die Kachel selbst.
 
 ## Nutzungsbedingungen und Datenschutz
