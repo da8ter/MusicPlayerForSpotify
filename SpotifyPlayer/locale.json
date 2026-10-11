@@ -14,6 +14,7 @@
             "Name": "Name",
             "Link": "Link",
             "Show sign-in link": "Anmeldelink anzeigen",
+            "Test connection": "Verbindung prüfen",
             "Renew access token": "Access-Token erneuern",
             "Sign out of Spotify": "Von Spotify abmelden",
             "No Client ID": "Keine Client-ID",

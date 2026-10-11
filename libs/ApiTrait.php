@@ -45,6 +45,34 @@ trait MusicPlayerSpotifyApiTrait
         throw new RuntimeException('Not signed in');
     }
 
+    /** Formular-Knopf „Verbindung prüfen“: eine Zeile je Endpunkt mit Ergebnis (für Fehlersuche und Support). */
+    public function TestConnection(): string
+    {
+        if (!$this->SignedIn()) {
+            return $this->Translate('Not signed in to Spotify');
+        }
+        $checks = [
+            'Profil (/v1/me)'                        => ['/v1/me', []],
+            'Geräte (/v1/me/player/devices)'          => ['/v1/me/player/devices', []],
+            'Zuletzt gespielt (recently-played)'      => ['/v1/me/player/recently-played', ['limit' => 1]],
+            'Top-Künstler (me/top/artists)'           => ['/v1/me/top/artists', ['limit' => 1]],
+            'Neuerscheinungen (browse/new-releases)'  => ['/v1/browse/new-releases', ['limit' => 1]],
+            'Playlists (me/playlists)'                => ['/v1/me/playlists', ['limit' => 1]],
+            'Suche (/v1/search)'                      => ['/v1/search', ['q' => 'a', 'type' => 'track', 'limit' => 1]],
+        ];
+        $lines = [];
+        foreach ($checks as $label => [$path, $query]) {
+            try {
+                $data = $this->Api('GET', $path, $query);
+                $count = count($data['items'] ?? $data['devices'] ?? $data['albums']['items'] ?? $data['tracks']['items'] ?? []);
+                $lines[] = $label . ': OK' . (isset($data['id']) ? ' (' . (string) ($data['product'] ?? '') . ')' : ' (' . $count . ')');
+            } catch (\Throwable $e) {
+                $lines[] = $label . ': ' . $e->getMessage();
+            }
+        }
+        return implode("\n", $lines);
+    }
+
     /** Vom Timer Poll und aus Skripten: Zustand des aktiven Geräts in die Variablen. */
     public function UpdateState(): bool
     {

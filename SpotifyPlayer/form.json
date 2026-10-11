@@ -75,6 +75,11 @@
         },
         {
             "type": "Button",
+            "caption": "Test connection",
+            "onClick": "echo SPM_TestConnection($id);"
+        },
+        {
+            "type": "Button",
             "caption": "Renew access token",
             "onClick": "echo SPM_RefreshAccessToken($id) ? 'OK' : 'Error, see log';"
         },

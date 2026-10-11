@@ -153,6 +153,10 @@ $module->RequestAction('AddFavorite', json_encode(['type' => 'track', 'id' => '4
 check($module->timers['ApplyFavorites'] === 200 && count(json_decode($module->TakePendingFavorites(), true)) === 2, 'Favorit aus der Kachel: vorgemerkt und beim Übernehmen angehängt');
 check(throws(fn () => $module->RequestAction('AddFavorite', json_encode(['type' => 'show', 'id' => '4uLU6hMCjMI75M1A2tKUQC'])), InvalidArgumentException::class), 'Favorit aus der Kachel: fremder Typ abgelehnt');
 
+$module->responses = [$json(['id' => 'stephan', 'product' => 'premium']), ['status' => 403, 'body' => '{"error":{"status":403,"message":"Forbidden"}}']];
+$report = $module->TestConnection();
+check(str_contains($report, 'Profil (/v1/me): OK (premium)') && str_contains($report, 'HTTP 403 Forbidden'), 'Verbindung prüfen: eine Zeile je Endpunkt mit Ergebnis');
+
 // ── Abmelden ──
 $module->Logout();
 check($module->status === 202 && end($module->updates) === ['type' => 'auth', 'signedIn' => false] && $module->timers['Poll'] === 0, 'Abmelden: Status, Signal und Timer');
