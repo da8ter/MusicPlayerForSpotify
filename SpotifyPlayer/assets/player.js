@@ -84,8 +84,8 @@
     document.documentElement.classList.toggle('no-volume', s.volume === null);
     if (s.volume !== null && document.activeElement !== $('volume')) $('volume').value = s.volume;
     setFill($('volume'));
-    // Gerät: Symbol und Name (eigene Kachel ohne Namen)
-    $('deviceIcon').innerHTML = svg(DEVICE_ICONS[s.deviceType] || 'speaker');
+    // Geräteknopf mit dem üblichen Streaming-Symbol, daneben der Name des Geräts (eigene Kachel ohne Namen)
+    $('deviceIcon').innerHTML = svg('stream');
     $('deviceName').textContent = s.deviceId && !s.local ? s.deviceName : '';
     $('bDevices').classList.toggle('on', !!s.deviceId && !s.local);
     updateLove(item && item.type === 'track' ? item.id : '');

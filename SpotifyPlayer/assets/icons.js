@@ -9,7 +9,7 @@
     play: 'play', pause: 'pause', stop: 'stop', next: 'forward-step', previous: 'backward-step',
     shuffle: 'shuffle', repeat: 'repeat', repeatOne: 'repeat-1', volume: 'volume', heart: 'heart',
     search: 'magnifying-glass', clear: 'xmark', back: 'chevron-left', check: 'check', more: 'ellipsis',
-    forward: 'chevron-right', down: 'chevron-down', queue: 'list-ul',
+    forward: 'chevron-right', down: 'chevron-down', queue: 'list-ul', stream: 'airplay',
     // Reiter und Seitenleiste
     home: 'house', new: 'grid-2', library: 'album-collection',
     albums: 'album', artists: 'microphone-stand', playlists: 'list-music', songs: 'heart', recent: 'clock-rotate-left', favorites: 'bookmark',
