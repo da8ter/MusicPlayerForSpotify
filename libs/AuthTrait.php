@@ -61,7 +61,10 @@ trait MusicPlayerSpotifyAuthTrait
     public function CompleteAuth(string $Code, string $State): string
     {
         $pending = $this->PendingAuth();
-        if (!preg_match('/^\d+\.[a-f0-9]{32}$/', $State) || !isset($pending[$State]) || !preg_match('/^[A-Za-z0-9_-]{1,512}$/', $Code)) {
+        if (!preg_match('/^\d+\.[a-f0-9]{32}$/', $State) || !isset($pending[$State]) || !preg_match('/^[A-Za-z0-9._~-]{1,2048}$/', $Code)) {
+            // Ohne Code und Zustand selbst zu loggen: nur der Grund
+            $reason = !preg_match('/^\d+\.[a-f0-9]{32}$/', $State) ? 'state malformed' : (!isset($pending[$State]) ? 'state unknown or older than 10 min (' . count($pending) . ' pending)' : 'code malformed');
+            $this->LogMessage($this->Translate('Sign-in rejected: unknown or expired request') . ' (' . $reason . ')', KL_WARNING);
             return $this->Translate('Sign-in rejected: unknown or expired request');
         }
         $verifier = $pending[$State]['verifier'];

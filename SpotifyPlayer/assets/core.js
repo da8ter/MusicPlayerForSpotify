@@ -365,6 +365,11 @@
       return;
     }
     if (msg.type === 'token' && typeof msg.accessToken === 'string') { setToken(msg.accessToken, Number(msg.expiresAt) || 0); return; }
+    if (msg.type === 'login' && msg.playerId === slot().playerId && typeof msg.url === 'string' && msg.url.indexOf('https://accounts.spotify.com/') === 0) {
+      if (loginWindow && !loginWindow.closed) loginWindow.location.href = msg.url;
+      else window.open(msg.url, '_blank', 'popup,width=520,height=760');
+      return;
+    }
     if (msg.type === 'favorites' && Array.isArray(msg.favorites)) { cfg.favorites = msg.favorites; emit('favorites'); }
   }
   window.handleMessage = receive;
@@ -373,11 +378,15 @@
     receive(ev.data);
   });
 
-  // Anmeldung: Spotify in einem eigenen Fenster; der Rückruf landet beim Modul, das die Kacheln neu lädt
+  // Anmeldung: das Fenster sofort im Klick öffnen (sonst blockt der Browser es), die Adresse mit
+  // frischem PKCE-Paar kommt vom Modul per Push (type login) für genau diese Kachel.
+  let loginWindow = null;
   function login() {
-    if (!cfg.authUrl) return;
-    const w = window.open(cfg.authUrl, '_blank', 'popup,width=520,height=760');
-    if (!w) emit('error', T('Sign-in window blocked: allow pop-ups for this page'));
+    loginWindow = window.open('', '_blank', 'popup,width=520,height=760');
+    if (!loginWindow) { emit('error', T('Sign-in window blocked: allow pop-ups for this page')); return; }
+    try { loginWindow.document.write('<p style="font:16px sans-serif;padding:24px">Spotify …</p>'); } catch (e) { /* egal */ }
+    action('Login', slot().playerId);
+    setTimeout(() => { if (loginWindow && !loginWindow.closed && loginWindow.location.href === 'about:blank') { loginWindow.close(); loginWindow = null; emit('error', T('Spotify could not be loaded')); } }, 10000);
   }
   function logout() {
     if (player) { try { player.disconnect(); } catch (e) { /* egal */ } }

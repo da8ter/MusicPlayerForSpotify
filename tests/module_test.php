@@ -160,6 +160,9 @@ check($module->values['Title'] === '' && $module->values['Device'] === '' && $mo
 IPS_ApplyChanges(12345);
 check(end($module->updates) === ['type' => 'reload'], 'Übernehmen nach Abmeldung lädt neu');
 $config = json_decode((static function (string $html): string { preg_match('#window\.SPM_CONFIG = (.*?);</script>#s', $html, $m); return $m[1]; })($module->GetVisualizationTile()), true);
-check($config['mode'] === 'login' && $config['accessToken'] === '' && str_starts_with($config['authUrl'], 'https://accounts.spotify.com/authorize?'), 'Kachel ohne Anmeldung: kein Token, aber Anmeldeadresse');
+check($config['mode'] === 'login' && $config['accessToken'] === '' && !isset($config['authUrl']), 'Kachel ohne Anmeldung: kein Token, keine Anmeldeadresse im Seitenaufbau');
+$module->RequestAction('Login', str_repeat('ab', 12));
+check(end($module->updates)['type'] === 'login' && end($module->updates)['playerId'] === str_repeat('ab', 12) && str_starts_with(end($module->updates)['url'], 'https://accounts.spotify.com/authorize?'), 'Anmeldung aus der Kachel: Adresse per Push nur für die anfragende Kachel');
+check(throws(fn () => $module->RequestAction('Login', 'x'), InvalidArgumentException::class), 'Anmeldung aus der Kachel: ungültige Kennung abgelehnt');
 
 echo PHP_EOL . 'All tests passed' . PHP_EOL;

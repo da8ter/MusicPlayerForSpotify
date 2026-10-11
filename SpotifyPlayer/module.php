@@ -158,7 +158,6 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             // Sichtbar für jeden mit Zugang zur Visualisierung: dieselben Personen bedienen den Player.
             'accessToken' => $signedIn ? $this->AccessToken(true) : '',
             'expiresAt'   => $signedIn ? $this->ReadAttributeInteger('AccessExpiry') : 0,
-            'authUrl'     => $clientId !== '' && !$signedIn ? $this->GetAuthURL() : '',
             'premium'     => $this->ReadAttributeString('Product') === 'premium',
             'playerName'  => mb_substr(trim($this->ReadPropertyString('PlayerName')) ?: 'Symcon', 0, 60),
             'userId'      => $this->ReadAttributeString('UserID'),
@@ -233,6 +232,14 @@ class MusicPlayerForSpotify extends IPSModuleStrict
                 $this->PlayFavorite((int) $Value);
                 return;
             // Ab hier: Aufrufe der Kachel. RequestAction ist öffentlich, jede Eingabe wird geprüft.
+            case 'Login':
+                // Anmeldeadresse erst beim Klick erzeugen; nur die anfragende Kachel (playerId) öffnet sie
+                $playerId = (string) $Value;
+                if (!preg_match('/^[a-f0-9]{24}$/', $playerId)) {
+                    throw new InvalidArgumentException('Invalid player');
+                }
+                $this->PushToTiles(['type' => 'login', 'playerId' => $playerId, 'url' => $this->GetAuthURL()]);
+                return;
             case 'Logout':
                 $this->Logout();
                 return;
