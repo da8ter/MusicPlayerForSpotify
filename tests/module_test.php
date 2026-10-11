@@ -67,7 +67,7 @@ parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
 $pending = json_decode($module->buffers['Auth'], true);
 $verifier = $pending[$q['state']]['verifier'];
 check(str_starts_with($url, 'https://accounts.spotify.com/authorize?') && $q['client_id'] === 'client123' && $q['code_challenge_method'] === 'S256'
-    && $q['redirect_uri'] === 'https://example.ipmagic.de/hook/spotifyplayer' && str_contains($q['scope'], 'streaming'), 'Anmeldeadresse: Client-ID, Redirect-URI, Scopes');
+    && $q['redirect_uri'] === 'https://example.ipmagic.de/hook/spotifyplayer' && str_contains($q['scope'], 'streaming') && !str_contains($q['scope'], 'email'), 'Anmeldeadresse: Client-ID, Redirect-URI, Scopes ohne E-Mail');
 check(preg_match('/^12345\.[a-f0-9]{32}$/', $q['state']) === 1 && $q['code_challenge'] === rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '='), 'PKCE: Zustand trägt die Instanz, Challenge = SHA-256 des Prüfwerts');
 check($module->CompleteAuth('code', '12345.' . str_repeat('a', 32)) !== '' && $module->http === [], 'Rückruf: unbekannter Zustand wird ohne Netzaufruf abgelehnt');
 $module->responses = [$json(['access_token' => 'ACCESS1xxxxxxxxxxxxxxxxxxxx', 'refresh_token' => 'REFRESH1xxxxxxxxxxxxxxxxxxx', 'expires_in' => 3600]), $json(['id' => 'stephan', 'display_name' => 'Stephan', 'product' => 'premium'])];
@@ -156,6 +156,7 @@ check(throws(fn () => $module->RequestAction('AddFavorite', json_encode(['type' 
 // ── Abmelden ──
 $module->Logout();
 check($module->status === 202 && end($module->updates) === ['type' => 'auth', 'signedIn' => false] && $module->timers['Poll'] === 0, 'Abmelden: Status, Signal und Timer');
+check($module->values['Title'] === '' && $module->values['Device'] === '' && $module->values['Playback'] === 1 && $module->buffers['TileDevice'] === '', 'Abmelden: Spotify-Daten aus Variablen und Puffern gelöscht');
 IPS_ApplyChanges(12345);
 check(end($module->updates) === ['type' => 'reload'], 'Übernehmen nach Abmeldung lädt neu');
 $config = json_decode((static function (string $html): string { preg_match('#window\.SPM_CONFIG = (.*?);</script>#s', $html, $m); return $m[1]; })($module->GetVisualizationTile()), true);

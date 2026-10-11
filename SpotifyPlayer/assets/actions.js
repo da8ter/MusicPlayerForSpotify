@@ -199,6 +199,8 @@
         box.appendChild(button(T('Delete playlist'), () => deletePlaylist(ref)));
       }
       if (!isTileFavorite(ref)) box.appendChild(button(T('Add to tile favorites'), () => addTileFavorite(ref)));
+      // Verweis auf Spotify (Branding Guidelines: gezeigte Inhalte verlinken auf Spotify)
+      box.appendChild(button(T('Open in Spotify'), () => { close(); window.open('https://open.spotify.com/' + ref.type + '/' + enc(ref.id), '_blank'); }));
     });
   }
 

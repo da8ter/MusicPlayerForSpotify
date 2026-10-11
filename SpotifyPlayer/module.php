@@ -40,7 +40,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         'Could not change the playlist', 'Could not change the library', 'Like', 'Remove like', 'Could not save',
         'Add to tile favorites', 'Added to tile favorites', 'Up Next', 'Shuffle', 'Repeat', 'Album', 'Playlist', 'Song', 'Artist',
         'Rename playlist', 'Delete playlist', 'Remove from playlist', 'Removed from playlist', 'Playlist renamed', 'Playlist deleted',
-        'Follow artist', 'Unfollow artist', 'Now following', 'Unfollowed', 'Could not switch the device', 'Playing on',
+        'Follow artist', 'Unfollow artist', 'Now following', 'Unfollowed', 'Could not switch the device', 'Playing on', 'Open in Spotify',
         'Playback needs a secure connection (https). Open the visualization via the Connect address.',
     ];
 
@@ -415,6 +415,18 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $deviceId = $text($state['deviceId'] ?? '', 80);
         if (preg_match('/^[A-Za-z0-9_-]{1,80}$/', $deviceId)) {
             $this->SetBuffer(($state['local'] ?? false) === true ? 'TileDevice' : 'ActiveDevice', $deviceId);
+        }
+    }
+
+    /** Nach dem Abmelden bleibt nichts von Spotify zurück (Developer Terms V.9): Variablen und Gerätepuffer leeren. */
+    private function ClearState(): void
+    {
+        foreach (['Title', 'Artist', 'Album', 'Cover', 'Device'] as $ident) {
+            $this->SetIfChanged($ident, '');
+        }
+        $this->SetIfChanged('Playback', 1);
+        foreach (['TileDevice', 'ActiveDevice', 'WantedDevice', 'PendingFavorites'] as $buffer) {
+            $this->SetBuffer($buffer, '');
         }
     }
 

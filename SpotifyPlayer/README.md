@@ -63,6 +63,17 @@ Alle Funktionen geben `false` zurück und schreiben ins Log, wenn kein Gerät er
 - Empfehlungen, ähnliche Künstler und redaktionelle Playlists stellt Spotify neuen Apps seit November 2024 nicht mehr bereit; „Start“ zeigt deshalb Hörverlauf, Top-Listen und Neuerscheinungen.
 - Das Access-Token ist in der Kachel sichtbar. Wer die Visualisierung öffnen darf, kann damit das Spotify-Konto bedienen, so wie über die Kachel selbst.
 
+## Nutzungsbedingungen und Datenschutz
+
+Das Modul nutzt die Spotify-Plattform über eine App, die du selbst bei Spotify anlegst. Damit gelten für dich die [Spotify Developer Terms](https://developer.spotify.com/terms) und die Spotify-Nutzungsbedingungen. Daraus folgt für die Nutzung dieses Moduls:
+
+- Das Modul ist ein unabhängiges Projekt. Es gibt keine Gewährleistung oder Zusicherung im Namen von Spotify; alle stillschweigenden Gewährleistungen für die Spotify-Plattform, den Spotify-Dienst und Spotify-Inhalte (Marktgängigkeit, Eignung für einen bestimmten Zweck, Nichtverletzung von Rechten) sind ausgeschlossen. Verantwortlich für das Modul ist sein Autor, nicht Spotify; Spotify haftet nicht für das Modul.
+- Die Spotify-Plattform, der Spotify-Dienst und Spotify-Inhalte dürfen nicht verändert, abgeleitet, dekompiliert oder zurückentwickelt werden, soweit das Gesetz nichts anderes erlaubt.
+- Spotify ist Drittbegünstigter dieser Bedingungen und kann sie unmittelbar durchsetzen.
+- **Welche Daten das Modul verarbeitet:** die Anmeldung bei Spotify (Refresh- und Access-Token, verschlüsselt in der Instanz), Benutzer-ID, Anzeigename und Abo-Art deines Spotify-Kontos, und den Wiedergabezustand (Titel, Interpret, Album, Cover-Adresse, Gerät, Lautstärke) in den Variablen. Die Kachel hält Listen aus Spotify höchstens fünf Minuten im Browser vor. Alle Daten bleiben in deinem Symcon und gehen ausschließlich an Spotify; das Modul gibt nichts an Dritte weiter, setzt keine Cookies und verkauft keine Daten.
+- **Verbindung trennen:** „Von Spotify abmelden“ (Kachel oder Instanz) löscht Token, Kontodaten und den Wiedergabezustand; die Instanz zu löschen entfernt alles. Danach fragt das Modul keine Daten mehr ab. Zusätzlich kannst du den Zugriff unter spotify.com in den Kontoeinstellungen (*Apps*) widerrufen.
+- Die Wiedergabe setzt Spotify Premium voraus; das Modul darf nicht gegen Bezahlung angeboten werden, denn eine kommerzielle Nutzung der Spotify-Plattform erfordert die schriftliche Zustimmung von Spotify.
+
 ## Marken
 
 Spotify ist eine Marke von Spotify AB. Dieses Modul ist kein Produkt von Spotify. Das Spotify-Logo erscheint in der Kachel als Herkunftshinweis für Inhalte aus Spotify, wie es die Spotify Design Guidelines verlangen.

@@ -13,7 +13,8 @@ trait MusicPlayerSpotifyAuthTrait
     private const TOKEN_URL = 'https://accounts.spotify.com/api/token';
     private const HOOK = 'spotifyplayer';
     private const CONNECT_GUID = '{9486D575-BE8C-4ED8-B5B5-20930E26DE6F}';
-    private const SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state '
+    // Nur, was die Kachel braucht (Developer Terms V.3): keine E-Mail-Adresse
+    private const SCOPES = 'streaming user-read-private user-read-playback-state user-modify-playback-state '
         . 'user-read-currently-playing user-library-read user-library-modify playlist-read-private playlist-read-collaborative '
         . 'playlist-modify-public playlist-modify-private user-read-recently-played user-top-read user-follow-read user-follow-modify';
     private const AUTH_TTL = 600;
@@ -104,6 +105,7 @@ trait MusicPlayerSpotifyAuthTrait
             // Spotify hat die Anmeldung widerrufen: neu anmelden statt endlos zu versuchen
             if (str_contains($e->getMessage(), 'invalid_grant')) {
                 $this->ClearTokens();
+                $this->ClearState();
                 $this->SetStatus(self::STATUS_SIGNED_OUT);
                 $this->PushToTiles(['type' => 'auth', 'signedIn' => false]);
             } else {
@@ -122,6 +124,7 @@ trait MusicPlayerSpotifyAuthTrait
             return;
         }
         $this->ClearTokens();
+        $this->ClearState();
         $this->SetTimerInterval('RefreshToken', 0);
         $this->SetTimerInterval('Poll', 0);
         $this->SetStatus(self::STATUS_SIGNED_OUT);

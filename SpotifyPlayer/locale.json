@@ -118,6 +118,7 @@
             "Unfollowed": "Nicht mehr gefolgt",
             "Could not switch the device": "Gerät konnte nicht gewechselt werden",
             "Playing on": "Wiedergabe auf",
+            "Open in Spotify": "In Spotify öffnen",
             "Playback needs a secure connection (https). Open the visualization via the Connect address.": "Die Wiedergabe braucht eine sichere Verbindung (https). Die Visualisierung über die Connect-Adresse öffnen."
         }
     }
