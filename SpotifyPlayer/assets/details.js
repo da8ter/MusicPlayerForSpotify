@@ -124,7 +124,7 @@
         ui.renderCards(unique, list, 'grid', yearOf);
       }
       if (!list.children.length) list.innerHTML = '<p class="empty">' + esc(T('No results')) + '</p>';
-    })().catch(() => { list.innerHTML = '<p class="empty">' + esc(T('No results')) + '</p>'; });
+    })().catch(e => { AMP.debug('artist: ' + (e && (e.stack || e.message) || e)); list.innerHTML = '<p class="empty">' + esc(T('No results')) + '</p>'; });
   }
 
   const yearOf = resource => {
@@ -170,6 +170,7 @@
       if (!list.children.length) list.innerHTML = '<p class="empty">' + esc(T('No results')) + '</p>';
       markPlaying();
     })().catch(e => {
+      AMP.debug('collection: ' + (e && (e.stack || e.message) || e));
       // Fremde und redaktionelle Playlists gibt Spotify neuen Apps nicht frei (HTTP 403)
       list.innerHTML = '<p class="empty">' + esc(T(e && e.status === 403 ? 'Spotify does not share this content with this app' : 'No results')) + '</p>';
     });

@@ -33,8 +33,12 @@
     crypto.getRandomValues(bytes);
     return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   }
-  function emit(kind, data) { listeners.forEach(fn => { try { fn(kind, data); } catch (e) { /* UI-Fehler nicht weiterreichen */ } }); }
+  function emit(kind, data) { listeners.forEach(fn => { try { fn(kind, data); } catch (e) { debug('listener ' + kind + ': ' + errText(e)); } }); }
   function action(ident, value) { try { requestAction(ident, value); } catch (e) { /* außerhalb von Symcon */ } }
+  // Fehler der Kachel landen im Debug-Fenster der Instanz (Fehlersuche ohne Browser-Konsole)
+  function debug(text) { action('Debug', String(text).slice(0, 1000)); }
+  window.addEventListener('error', e => debug('error: ' + (e.message || '') + ' @' + (e.lineno || 0)));
+  window.addEventListener('unhandledrejection', e => debug('rejection: ' + errText(e.reason)));
 
   // Gemeinsamer Zustand des Fensters, das den SDK-Player besitzt. Objekte des Hauptfensters,
   // damit es keine (später verworfene) Kachel festhält.
@@ -87,6 +91,7 @@
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
       if (!res.ok) {
+        debug('api ' + method + ' ' + path + ' -> ' + res.status + ' ' + ((data.error && (data.error.reason || data.error.message)) || ''));
         const err = new Error((data.error && (data.error.reason || data.error.message)) || ('HTTP ' + res.status));
         err.status = res.status;
         err.reason = data.error && data.error.reason;
@@ -430,7 +435,7 @@
   }
 
   window.AMP = {
-    cfg, T, start, run, api, apiAll, call, clearCache, login, logout, state, artwork,
+    cfg, T, start, run, api, apiAll, call, clearCache, login, logout, state, artwork, debug,
     devices: listDevices,
     onChange: fn => listeners.push(fn),
     notify: text => emit('notice', text),

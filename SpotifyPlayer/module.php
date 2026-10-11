@@ -264,6 +264,10 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             case 'AddFavorite':
                 $this->QueueFavorite((string) $Value);
                 return;
+            case 'Debug':
+                // Fehler der Kachel ins Debug-Fenster der Instanz (nur sichtbar, wenn Debug läuft)
+                $this->SendDebug('Tile', mb_substr((string) $Value, 0, 1000), 0);
+                return;
         }
         throw new InvalidArgumentException('Invalid ident ' . $Ident);
     }
