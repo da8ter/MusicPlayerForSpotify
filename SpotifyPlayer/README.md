@@ -61,7 +61,7 @@ Alle Funktionen geben `false` zurück und schreiben ins Log, wenn kein Gerät er
 ## Grenzen
 
 - Spotify stellt neue Titel nur hinten an die Warteschlange; „Als Nächstes“ gibt es in der Web API nicht. Die Warteschlange lässt sich anzeigen, aber nicht umsortieren.
-- Spotify gibt Apps im Development Mode einiges nicht mehr frei (HTTP 403): Neuerscheinungen und andere Browse-Inhalte, Empfehlungen, ähnliche Künstler, die Top-Titel eines Künstlers sowie die Titel fremder und redaktioneller Playlists. „Start“ und „Neu“ bauen deshalb auf deiner Mediathek und deinen Künstlern auf, die Künstlerseite holt Titel über die Suche, und bei gesperrten Playlists steht ein Hinweis.
+- Spotify gibt Apps im Development Mode einiges nicht mehr frei (HTTP 403): Neuerscheinungen und andere Browse-Inhalte, Empfehlungen, ähnliche Künstler, die Top-Titel eines Künstlers sowie die Titel fremder und redaktioneller Playlists. „Start“ und „Neu“ bauen deshalb auf deiner Mediathek und deinen Künstlern auf, die Künstlerseite holt Titel über die Suche, und bei gesperrten Playlists steht ein Hinweis. Ob ein Titel, Album oder Künstler schon in der Mediathek ist, lässt sich ebenfalls nicht abfragen; das Menü bietet dann Hinzufügen und Entfernen an. Suche und Künstleralben liefert Spotify nur in Zehnerschritten.
 - Das Access-Token ist in der Kachel sichtbar. Wer die Visualisierung öffnen darf, kann damit das Spotify-Konto bedienen, so wie über die Kachel selbst.
 
 ## Nutzungsbedingungen und Datenschutz

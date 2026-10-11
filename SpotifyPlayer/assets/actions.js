@@ -106,6 +106,7 @@
   }
 
   // ── Mediathek: gespeichert (Titel, Alben), gefolgt (Künstler, Playlists) ──
+  // null: unbekannt (die contains-Abfragen bekommen neue Apps nicht, HTTP 403)
   async function inLibrary(ref) {
     try {
       if (ref.type === 'track') return (await AMP.call('GET', '/v1/me/tracks/contains', { ids: ref.id }))[0] === true;
@@ -113,7 +114,7 @@
       if (ref.type === 'artist') return (await AMP.call('GET', '/v1/me/following/contains', { type: 'artist', ids: ref.id }))[0] === true;
       if (ref.type === 'playlist') return (await AMP.call('GET', '/v1/playlists/' + enc(ref.id) + '/followers/contains', { ids: AMP.cfg.userId }))[0] === true;
     } catch (e) { /* unbekannt */ }
-    return false;
+    return null;
   }
   function setLibrary(ref, on) {
     const method = on ? 'PUT' : 'DELETE';
@@ -128,23 +129,29 @@
     playlist: ['Add to library', 'Remove from library', 'Added to library', 'Removed from library'],
     artist: ['Follow artist', 'Unfollow artist', 'Now following', 'Unfollowed'],
   };
-  // Beschriftung erst, wenn bekannt ist, ob der Eintrag schon in der Mediathek ist
+  // Hinzufügen oder Entfernen, je nachdem, ob der Eintrag schon in der Mediathek ist; ist das
+  // nicht zu erfahren, stehen beide Knöpfe da
   function libraryButton(ref) {
     const labels = LIBRARY_LABELS[ref.type];
-    const b = button(T(labels[0]), null);
-    b.disabled = true;
+    const act = on => async () => {
+      close();
+      try {
+        await setLibrary(ref, on);
+        AMP.notify(T(on ? labels[2] : labels[3]));
+      } catch (e) { AMP.notify(T('Could not change the library')); }
+    };
+    const add = button(T(labels[0]), act(true));
+    const remove = button(T(labels[1]), act(false));
+    add.disabled = remove.disabled = true;
     inLibrary(ref).then(has => {
-      b.disabled = false;
-      b.textContent = T(has ? labels[1] : labels[0]);
-      b.onclick = async () => {
-        close();
-        try {
-          await setLibrary(ref, !has);
-          AMP.notify(T(has ? labels[3] : labels[2]));
-        } catch (e) { AMP.notify(T('Could not change the library')); }
-      };
+      add.disabled = remove.disabled = false;
+      add.hidden = has === true;
+      remove.hidden = has === false;
     });
-    return b;
+    const both = document.createDocumentFragment();
+    both.appendChild(add);
+    both.appendChild(remove);
+    return both;
   }
 
   // ── Eigene Playlists bearbeiten ──

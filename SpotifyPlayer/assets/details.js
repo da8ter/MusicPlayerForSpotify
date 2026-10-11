@@ -97,12 +97,13 @@
         try { return (await AMP.api(base + '/top-tracks', { market: 'from_token' })).tracks || []; } catch (e) { /* Rückfall */ }
         const name = resource.name || (await AMP.api(base).catch(() => ({}))).name || '';
         if (!name) return [];
-        const found = await AMP.api('/v1/search', { q: 'artist:"' + name.replace(/"/g, '') + '"', type: 'track', limit: 20, market: 'from_token' }).catch(() => ({}));
+        const found = await AMP.api('/v1/search', { q: 'artist:"' + name.replace(/"/g, '') + '"', type: 'track', limit: 10, market: 'from_token' }).catch(() => ({}));
         return ((found.tracks && found.tracks.items) || []).filter(t => t && (t.artists || []).some(a => a.id === id));
       };
       const [top, albums] = await Promise.all([
         topTracks(),
-        AMP.api(base + '/albums', { include_groups: 'album,single', limit: 50, market: 'from_token' }).catch(() => ({ items: [] })),
+        // Spotify erlaubt neuen Apps hier höchstens limit 10: seitenweise bis 50
+        AMP.apiAll(base + '/albums', { include_groups: 'album,single', limit: 10, market: 'from_token' }, 50).catch(() => []),
       ]);
       list.innerHTML = '';
       const tracks = top.slice(0, 10);
@@ -116,7 +117,7 @@
       }
       // Alben als Kachelraster mit Erscheinungsjahr, ohne Dubletten (gleicher Name in mehreren Märkten)
       const seen = {};
-      const unique = (albums.items || []).filter(a => a && a.name && !seen[a.name] && (seen[a.name] = true));
+      const unique = albums.filter(a => a && a.name && !seen[a.name] && (seen[a.name] = true));
       if (unique.length) {
         const h = document.createElement('h3');
         h.textContent = T('Albums');

@@ -44,7 +44,7 @@
     loveFor = id;
     loved = false;
     renderLove();
-    if (id) window.AMPActions.inLibrary({ type: 'track', id }).then(value => { if (loveFor === id) { loved = value; renderLove(); } });
+    if (id) window.AMPActions.inLibrary({ type: 'track', id }).then(value => { if (loveFor === id) { loved = value === true; renderLove(); } });
   }
 
   // ── Zustand zeichnen ──
