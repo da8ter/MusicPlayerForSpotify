@@ -52,6 +52,7 @@ SPM_PlayURL(int $InstanzID, string $Link): bool;           // open.spotify.com-L
 SPM_TransferPlayback(int $InstanzID, string $Geraet): bool; // Name wie in Spotify Connect
 SPM_UpdateState(int $InstanzID): bool;                     // Variablen sofort aktualisieren
 SPM_RefreshAccessToken(int $InstanzID): bool;
+SPM_Request(int $InstanzID, string $Methode, string $Pfad, string $QueryJSON = '', string $BodyJSON = ''): string; // Rohzugriff auf die Web API, Antwort als JSON
 SPM_Logout(int $InstanzID): void;
 ```
 

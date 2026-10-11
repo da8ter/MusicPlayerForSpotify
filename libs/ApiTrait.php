@@ -45,6 +45,31 @@ trait MusicPlayerSpotifyApiTrait
         throw new RuntimeException('Not signed in');
     }
 
+    /**
+     * Rohzugriff auf die Web API für Skripte: SPM_Request($id, 'GET', '/v1/me/playlists', '{"limit":5}').
+     * Liefert die Antwort als JSON ('{}' bei leerer Antwort) oder '' mit Logmeldung bei Fehlern.
+     */
+    public function Request(string $Method, string $Path, string $Query = '', string $Body = ''): string
+    {
+        $method = strtoupper(trim($Method));
+        if (!in_array($method, ['GET', 'PUT', 'POST', 'DELETE'], true) || !preg_match('#^/v1/[A-Za-z0-9/._~%-]+$#', $Path)) {
+            $this->LogMessage($this->Translate('Spotify command failed') . ' (request): invalid method or path', KL_WARNING);
+            return '';
+        }
+        $query = $Query === '' ? [] : json_decode($Query, true);
+        $body = $Body === '' ? null : json_decode($Body, true);
+        if (!is_array($query) || ($Body !== '' && !is_array($body))) {
+            $this->LogMessage($this->Translate('Spotify command failed') . ' (request): query and body must be JSON objects', KL_WARNING);
+            return '';
+        }
+        try {
+            return json_encode($this->Api($method, $Path, $query, $body), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\Throwable $e) {
+            $this->LogMessage($this->Translate('Spotify command failed') . ' (' . $method . ' ' . $Path . '): ' . $e->getMessage(), KL_WARNING);
+            return '';
+        }
+    }
+
     /** Formular-Knopf „Verbindung prüfen“: eine Zeile je Endpunkt mit Ergebnis (für Fehlersuche und Support). */
     public function TestConnection(): string
     {

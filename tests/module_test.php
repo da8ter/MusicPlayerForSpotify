@@ -157,6 +157,10 @@ $module->responses = [$json(['id' => 'stephan', 'product' => 'premium']), ['stat
 $report = $module->TestConnection();
 check(str_contains($report, 'Profil (/v1/me): OK (premium)') && str_contains($report, 'HTTP 403 Forbidden'), 'Verbindung prüfen: eine Zeile je Endpunkt mit Ergebnis');
 
+$module->responses = [$json(['items' => [['id' => 'x']]])];
+check(json_decode($module->Request('get', '/v1/me/playlists', '{"limit":1}'), true)['items'][0]['id'] === 'x' && str_contains(end($module->http)['url'], 'limit=1'), 'Request: Rohzugriff für Skripte');
+check($module->Request('GET', 'https://evil', '') === '' && $module->Request('PATCH', '/v1/me', '') === '', 'Request: fremde Adressen und Methoden abgelehnt');
+
 // ── Abmelden ──
 $module->Logout();
 check($module->status === 202 && end($module->updates) === ['type' => 'auth', 'signedIn' => false] && $module->timers['Poll'] === 0, 'Abmelden: Status, Signal und Timer');
