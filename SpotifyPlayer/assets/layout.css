@@ -46,7 +46,8 @@ html.wide .sidebar {
 .side-foot { flex: none; padding: 6px 10px 12px; }
 /* Markenhinweis: Spotify-Logo in Spotify-Grün neben Inhalten aus Spotify */
 .brand { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
-.brand svg { width: 18px; height: 18px; color: #1ED760; }
+.brand svg { width: 22px; height: 22px; color: #1ED760; }
+.brand span { font-size: 13px; letter-spacing: .01em; }
 
 /* ── Reiter unten (schmal): Glas-Kapsel, so breit wie ihr Inhalt (nav.js), daneben die Suche ── */
 .tabdock {

@@ -1,6 +1,7 @@
 /* Musikplayer für Spotify – Inhalte der Bereiche: Start (zuletzt gehört, Top-Künstler, Top-Titel,
-   Neuerscheinungen), Neu (Neuerscheinungen) und die Mediathek mit ihren Kategorien.
-   Bausteine kommen aus ui.js (window.AMPUI). */
+   eigene Playlists, gespeicherte Alben, gefolgte Künstler), Neu (neue Alben der eigenen Künstler,
+   zuletzt gespeichert; Spotifys Neuerscheinungen nur, wo die App sie noch bekommt) und die
+   Mediathek mit ihren Kategorien. Bausteine kommen aus ui.js (window.AMPUI). */
 (function () {
   'use strict';
   const AMP = window.AMP;
@@ -13,36 +14,59 @@
     const seen = {};
     return (items || []).map(i => i.track).filter(t => t && t.id && !seen[t.id] && (seen[t.id] = true));
   };
+  const albumsOf = data => (data.items || []).map(i => i && i.album).filter(Boolean);
+  const followed = data => (data.artists && data.artists.items) || [];
 
   // ── Start ──
+  // Hörverlauf und Top-Listen sind bei neuen Konten leer: dann tragen Playlists, Alben und Künstler die Seite
   function home() {
     ui.page(T('Home'));
     if (ui.notSignedIn()) return;
     ui.load(async current => {
-      const [recent, artists, tracks, releases] = await Promise.all([
+      const [recent, artists, tracks, playlists, albums, following] = await Promise.all([
         AMP.api('/v1/me/player/recently-played', { limit: 30 }).catch(none),
         AMP.api('/v1/me/top/artists', { limit: 12, time_range: 'short_term' }).catch(none),
         AMP.api('/v1/me/top/tracks', { limit: 12, time_range: 'short_term' }).catch(none),
-        AMP.api('/v1/browse/new-releases', { limit: 12 }).catch(() => ({ albums: { items: [] } })),
+        AMP.api('/v1/me/playlists', { limit: 12 }).catch(none),
+        AMP.api('/v1/me/albums', { limit: 12 }).catch(none),
+        AMP.api('/v1/me/following', { type: 'artist', limit: 12 }).catch(none),
       ]);
       if (!current()) return;
       let any = ui.section(T('Recently played'), uniqueTracks(recent.items).slice(0, 12), 'shelf');
       any = ui.section(T('Top artists'), artists.items, 'shelf') || any;
       any = ui.section(T('Top songs'), tracks.items, 'shelf') || any;
-      any = ui.section(T('New releases'), releases.albums && releases.albums.items, 'shelf') || any;
+      any = ui.section(T('Your playlists'), (playlists.items || []).filter(Boolean), 'shelf') || any;
+      any = ui.section(T('Saved albums'), albumsOf(albums), 'shelf') || any;
+      any = ui.section(T('Artists you follow'), followed(following), 'shelf') || any;
       if (!any) ui.renderList([], T('No results'));
     });
   }
 
-  // ── Neu: Neuerscheinungen des eigenen Landes ──
+  // ── Neu: neue Alben der Künstler, denen du folgst oder die du oft hörst; zuletzt gespeichert ──
+  // Spotifys Neuerscheinungen (browse/new-releases) bekommen neue Apps nicht mehr (HTTP 403); wo doch, stehen sie oben.
   function fresh() {
     ui.page(T('New'));
+    if (ui.notSignedIn()) return;
     ui.load(async current => {
-      const data = await AMP.api('/v1/browse/new-releases', { limit: 50 });
+      const [releases, following, top, saved] = await Promise.all([
+        AMP.api('/v1/browse/new-releases', { limit: 20 }).catch(() => ({ albums: { items: [] } })),
+        AMP.api('/v1/me/following', { type: 'artist', limit: 20 }).catch(none),
+        AMP.api('/v1/me/top/artists', { limit: 10, time_range: 'medium_term' }).catch(none),
+        AMP.api('/v1/me/albums', { limit: 20 }).catch(none),
+      ]);
       if (!current()) return;
-      const albums = (data.albums && data.albums.items) || [];
-      if (!albums.length) { ui.renderList([], T('No results')); return; }
-      ui.renderCards(albums, $('panel'), 'grid');
+      let any = ui.section(T('New releases'), releases.albums && releases.albums.items, 'shelf');
+      // Je Künstler die drei jüngsten Alben oder Singles, alle zusammen nach Erscheinungsdatum
+      const seen = {};
+      const artists = followed(following).concat(top.items || []).filter(a => a && a.id && !seen[a.id] && (seen[a.id] = true)).slice(0, 20);
+      const lists = await Promise.all(artists.map(a => AMP.api('/v1/artists/' + encodeURIComponent(a.id) + '/albums', { include_groups: 'album,single', limit: 3, market: 'from_token' }).catch(none)));
+      if (!current()) return;
+      const ids = {};
+      const latest = lists.flatMap(l => l.items || []).filter(a => a && a.id && !ids[a.id] && (ids[a.id] = true))
+        .sort((a, b) => String(b.release_date || '').localeCompare(String(a.release_date || ''))).slice(0, 30);
+      any = ui.section(T('New from your artists'), latest, 'grid') || any;
+      any = ui.section(T('Recently saved'), albumsOf(saved), 'grid') || any;
+      if (!any) ui.renderList([], T('No results'));
     });
   }
 

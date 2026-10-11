@@ -32,7 +32,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         'Sign-in window blocked: allow pop-ups for this page', 'Sign-in expired. Please sign in again.',
         'Spotify Premium is required for playback', 'Spotify could not be loaded',
         'Home', 'New', 'Library', 'Search', 'Favorites', 'Playlists', 'Albums', 'Artists', 'Liked Songs', 'Recently played',
-        'New releases', 'Top artists', 'Top songs', 'Search Spotify', 'Songs', 'No results', 'Loading…', 'The queue is empty',
+        'New releases', 'Top artists', 'Top songs', 'Your playlists', 'Saved albums', 'Artists you follow', 'New from your artists', 'Recently saved', 'Search Spotify', 'Songs', 'No results', 'Loading…', 'The queue is empty',
         'Playback failed', 'No device available: open the tile in a browser or start Spotify on a device', 'Devices', 'This tile',
         'Nothing playing', 'Back', 'Play album', 'Play playlist', 'Play', 'Pause', 'Next', 'Close', 'More', 'Cancel',
         'Add to queue', 'Add to playlist…', 'Add to playlist', 'Add to library', 'Remove from library', 'Added to the queue',
