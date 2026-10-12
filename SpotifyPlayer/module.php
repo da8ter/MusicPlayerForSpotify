@@ -49,7 +49,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         parent::Create();
 
         $this->RegisterPropertyString('PlayerName', 'Symcon');
-        $this->RegisterPropertyInteger('PollInterval', 15);
+        $this->RegisterPropertyInteger('PollInterval', 30);
         $this->RegisterPropertyString('Favorites', '[]');
 
         $this->RegisterAttributeString('RefreshSecret', '');
@@ -60,6 +60,8 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->RegisterAttributeString('Product', '');
         $this->RegisterAttributeString('TokenSource', '');
         $this->RegisterAttributeString('TileHash', '');
+        $this->RegisterAttributeInteger('RateLimitUntil', 0);
+        $this->RegisterAttributeInteger('RateLimitStep', 0);
 
         $this->RegisterTimer('RefreshToken', 0, 'SPM_RefreshAccessToken($_IPS[\'TARGET\']);');
         $this->RegisterTimer('Poll', 0, 'SPM_PollState($_IPS[\'TARGET\']);');

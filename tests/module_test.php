@@ -139,11 +139,20 @@ check(!$module->UpdateState() && str_contains(end($module->logs), '120'), 'HTTP 
 $module->PollState();
 check(count($module->http) === 1 && $module->timers['Poll'] >= 119000, 'HTTP 429: keine weiteren Abrufe, Timer wartet Retry-After ab');
 check(!$module->Play() && count($module->http) === 1, 'HTTP 429: auch Befehle warten, ohne Spotify anzufragen');
-$module->buffers['RateLimitUntil'] = '';
+check($module->attributes['RateLimitUntil'] - time() >= 119, 'HTTP 429: Sperre im Attribut (übersteht einen Neustart)');
+$module->attributes['RateLimitUntil'] = 0;
 $module->responses = [['status' => 429, 'body' => '']];
 $module->UpdateState();
-check((int) $module->buffers['RateLimitUntil'] - time() >= 29, 'HTTP 429 ohne Retry-After: mindestens 30 s Pause');
-$module->buffers['RateLimitUntil'] = '';
+$first = $module->attributes['RateLimitUntil'] - time();
+$module->attributes['RateLimitUntil'] = 0;
+$module->responses = [['status' => 429, 'body' => '']];
+$module->UpdateState();
+$second = $module->attributes['RateLimitUntil'] - time();
+check($first >= 29 && $first <= 30 && $second >= 59 && $second <= 60, 'HTTP 429 ohne Retry-After: 30 s, beim nächsten 429 doppelt so lange');
+$module->attributes['RateLimitUntil'] = 0;
+$module->responses = [$json(['is_playing' => false])];
+$module->UpdateState();
+check($module->attributes['RateLimitStep'] === 0, 'Nach einer erfolgreichen Antwort beginnt die Pause wieder bei 30 s');
 $module->http = [];
 
 // ── Variablen ──

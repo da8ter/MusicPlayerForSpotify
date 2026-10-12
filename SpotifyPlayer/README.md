@@ -35,7 +35,7 @@ Wer vorher eine eigene Spotify-App mit Client ID genutzt hat: Nach dem Update is
 | Favorit | startet einen Favoriten (schaltbar, nur mit Favoriten) |
 | Aktives Gerät | Name des Spotify-Connect-Geräts, das gerade spielt |
 
-Solange eine Kachel offen ist, meldet sie jede Änderung sofort, und die Instanz fragt selbst nicht ab. Sonst fragt die Instanz während der Wiedergabe im eingestellten Abstand ab (Vorgabe 15 s, 0 = aus), ohne Wiedergabe höchstens alle 60 s. Spotify begrenzt die Abrufe je App und antwortet bei Überschreitung mit HTTP 429; Instanz und Kachel pausieren dann für die von Spotify genannte Zeit, mindestens 30 s, und schreiben eine Warnung ins Log.
+Solange eine Kachel offen ist, meldet sie jede Änderung sofort, und die Instanz fragt selbst nicht ab. Sonst fragt die Instanz während der Wiedergabe im eingestellten Abstand ab (Vorgabe 30 s, 0 = aus), ohne Wiedergabe höchstens alle 60 s. Spotify begrenzt die Abrufe je App und antwortet bei Überschreitung mit HTTP 429; Instanz und Kachel pausieren dann für die von Spotify genannte Zeit, mindestens 30 s; fehlt die Angabe, bei jedem weiteren 429 doppelt so lange (höchstens eine Stunde). Die Instanz schreibt eine Warnung ins Log, und eine Sperre übersteht auch einen Neustart.
 
 ## Funktionen
 

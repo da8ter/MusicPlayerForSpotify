@@ -95,12 +95,16 @@
       const res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
       if (res.status === 401 && attempt === 0) { token = ''; await requestToken(); continue; }
       if (res.status === 429) {
-        // Retry-After gibt Spotify nicht jedem Ursprung frei: dann mindestens 30 s
-        const wait = Math.max(RATE_LIMIT_MIN, (parseInt(res.headers.get('Retry-After'), 10) || 0) * 1000);
-        slot().rateLimitUntil = Date.now() + wait;
+        // Retry-After gibt Spotify Browsern nicht frei: dann 30 s, bei jedem weiteren 429 doppelt so lange (höchstens 1 h)
+        const s = slot();
+        const retry = (parseInt(res.headers.get('Retry-After'), 10) || 0) * 1000;
+        const wait = retry > 0 ? Math.max(RATE_LIMIT_MIN, retry) : Math.min(3600000, Math.max(RATE_LIMIT_MIN, (s.rateLimitStep || 0) * 2));
+        s.rateLimitStep = retry > 0 ? 0 : wait;
+        s.rateLimitUntil = Date.now() + wait;
         debug('api ' + method + ' ' + path + ' -> 429, pause ' + Math.round(wait / 1000) + ' s');
         throw rateLimitError();
       }
+      slot().rateLimitStep = 0;
       if (res.status === 204 || res.status === 202) return {};
       const text = await res.text();
       let data = {};
