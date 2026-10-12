@@ -235,18 +235,23 @@
     panel.onscroll = null;
     panel.innerHTML = '';
     panel.scrollTop = 0;
+    // Unterseiten: Zurück und Titel bleiben beim Blättern oben stehen
+    let head = panel;
     if (backTo && (!wide || always)) {
+      head = document.createElement('div');
+      head.className = 'page-head';
+      panel.appendChild(head);
       const back = document.createElement('button');
       back.className = 'back';
       back.innerHTML = svg('back') + '<span>' + esc(T(LABELS[backTo])) + '</span>';
       back.onclick = () => select(backTo);
-      panel.appendChild(back);
+      head.appendChild(back);
     }
     if (title) {
       const h = document.createElement('h1');
       h.className = 'page-title';
       h.textContent = title;
-      panel.appendChild(h);
+      head.appendChild(h);
     }
     return panel;
   }

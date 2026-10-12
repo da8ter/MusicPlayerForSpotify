@@ -146,7 +146,14 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 /* Seiten wie in der Musik-App: großer Titel, fette Abschnittsüberschriften */
 .page-title { font-size: 28px; line-height: 1.15; font-weight: 700; margin: 4px 4px 6px; }
 .panel h3 { font-size: 18px; font-weight: 700; margin: 18px 4px 8px; }
-.panel h3:first-child, .page-title + h3 { margin-top: 8px; }
+.panel h3:first-child, .page-title + h3, .page-head + h3 { margin-top: 8px; }
+/* Kopf einer Unterseite (Zurück + Titel) bleibt beim Blättern oben, Inhalt läuft verschwommen darunter */
+.page-head {
+  position: sticky; top: 0; z-index: 3; margin: 0 -4px; padding: 0 4px 4px;
+  background: color-mix(in srgb, var(--card-color, #1c1c1e) 90%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+}
+.page-head .page-title { margin-bottom: 2px; }
 
 /* Kategorien der Mediathek */
 .categories { display: flex; flex-direction: column; margin: 0 4px 6px; }
