@@ -11,15 +11,25 @@ trait MusicPlayerSpotifyApiTrait
     private const API_URL = 'https://api.spotify.com';
     private const REPEAT_TO_SPOTIFY = [0 => 'off', 1 => 'context', 2 => 'track'];
     private const REPEAT_FROM_SPOTIFY = ['off' => 0, 'context' => 1, 'track' => 2];
+    // Spotify zählt Abrufe je App in einem gleitenden 30-s-Fenster; nach HTTP 429 so lange still
+    private const RATE_LIMIT_MIN = 30;
+    // Abfrage der Variablen: im Leerlauf (keine Wiedergabe) höchstens so oft
+    private const POLL_IDLE = 60;
+    // So lange gilt eine Meldung der Kachel als frisch (sie meldet bei Änderungen und alle 30 s)
+    private const TILE_REPORT_FRESH = 35;
 
     /**
-     * Aufruf der Web API mit Access-Token; bei 401 einmal erneuern und wiederholen.
-     * Liefert das JSON als Array ([] bei leerer Antwort) oder wirft bei Fehlern.
+     * Aufruf der Web API mit Access-Token; bei 401 einmal erneuern und wiederholen, nach 429 bis
+     * Retry-After (mindestens 30 s) gar nicht. Liefert das JSON als Array ([] bei leerer Antwort) oder wirft bei Fehlern.
      * @return array<string, mixed>
      */
     private function Api(string $Method, string $Path, array $Query = [], ?array $Body = null): array
     {
         for ($attempt = 0; $attempt < 2; $attempt++) {
+            $wait = (int) $this->GetBuffer('RateLimitUntil') - time();
+            if ($wait > 0) {
+                throw new RuntimeException('HTTP 429 (' . sprintf($this->Translate('paused for %d s'), $wait) . ')');
+            }
             $token = $this->AccessToken(true);
             if ($token === '') {
                 throw new RuntimeException('Not signed in');
@@ -33,6 +43,12 @@ trait MusicPlayerSpotifyApiTrait
             if ($response['status'] === 401 && $attempt === 0) {
                 $this->WriteAttributeInteger('AccessExpiry', 0);
                 continue;
+            }
+            if ($response['status'] === 429) {
+                $wait = max(self::RATE_LIMIT_MIN, (int) ($response['retryAfter'] ?? 0));
+                $this->SetBuffer('RateLimitUntil', (string) (time() + $wait));
+                $this->LogMessage(sprintf($this->Translate('Spotify rate limit reached: requests paused for %d s'), $wait), KL_WARNING);
+                throw new RuntimeException('HTTP 429 (' . sprintf($this->Translate('paused for %d s'), $wait) . ')');
             }
             if ($response['status'] >= 200 && $response['status'] < 300) {
                 $data = $response['body'] === '' ? [] : json_decode($response['body'], true);
@@ -98,7 +114,31 @@ trait MusicPlayerSpotifyApiTrait
         return implode("\n", $lines);
     }
 
-    /** Vom Timer Poll und aus Skripten: Zustand des aktiven Geräts in die Variablen. */
+    /**
+     * Timer Poll: Variablen abgleichen, außer eine Kachel hat den Zustand gerade gemeldet.
+     * Abstand: während der Wiedergabe wie eingestellt, sonst höchstens alle 60 s; nach 429 erst danach.
+     */
+    public function PollState(): void
+    {
+        if (time() - (int) $this->GetBuffer('TileReport') >= self::TILE_REPORT_FRESH) {
+            $this->UpdateState();
+        }
+        $this->SchedulePoll();
+    }
+
+    private function SchedulePoll(): void
+    {
+        $interval = max(0, $this->ReadPropertyInteger('PollInterval'));
+        if (!$this->SignedIn() || $interval === 0) {
+            $this->SetTimerInterval('Poll', 0);
+            return;
+        }
+        $seconds = $this->GetValue('Playback') === 2 ? $interval : max($interval, self::POLL_IDLE);
+        $wait = (int) $this->GetBuffer('RateLimitUntil') - time();
+        $this->SetTimerInterval('Poll', max($seconds, $wait) * 1000);
+    }
+
+    /** Aus Skripten und nach Befehlen: Zustand des aktiven Geräts sofort in die Variablen. */
     public function UpdateState(): bool
     {
         if (!$this->SignedIn()) {

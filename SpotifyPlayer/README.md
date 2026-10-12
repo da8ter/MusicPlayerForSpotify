@@ -35,7 +35,7 @@ Wer vorher eine eigene Spotify-App mit Client ID genutzt hat: Nach dem Update is
 | Favorit | startet einen Favoriten (schaltbar, nur mit Favoriten) |
 | Aktives Gerät | Name des Spotify-Connect-Geräts, das gerade spielt |
 
-Die Variablen werden im eingestellten Abstand (Vorgabe 10 s, 0 = aus) über die Web API aktualisiert und zusätzlich sofort von jeder offenen Kachel.
+Solange eine Kachel offen ist, meldet sie jede Änderung sofort, und die Instanz fragt selbst nicht ab. Sonst fragt die Instanz während der Wiedergabe im eingestellten Abstand ab (Vorgabe 15 s, 0 = aus), ohne Wiedergabe höchstens alle 60 s. Spotify begrenzt die Abrufe je App und antwortet bei Überschreitung mit HTTP 429; Instanz und Kachel pausieren dann für die von Spotify genannte Zeit, mindestens 30 s, und schreiben eine Warnung ins Log.
 
 ## Funktionen
 

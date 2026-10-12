@@ -12,9 +12,13 @@
         {
             "type": "NumberSpinner",
             "name": "PollInterval",
-            "caption": "Update variables every",
+            "caption": "Update variables during playback every",
             "suffix": " s",
             "minimum": 0
+        },
+        {
+            "type": "Label",
+            "caption": "Without playback at most every 60 s. While a tile is open, it reports the state itself and the instance does not query."
         },
         {
             "type": "List",

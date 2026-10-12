@@ -74,7 +74,7 @@ check($module->status === IS_ACTIVE && $module->attributes['UserID'] === 'stepha
 check(!str_contains(json_encode($module->attributes), 'REFRESH1xxxxxxxxxxxxxxxxxxx') && !str_contains(json_encode($module->attributes), 'ACCESS1xxxxxxxxxxxxxxxxxxxx'), 'Token liegen nur verschlüsselt in Attributen');
 check(end($module->updates) === ['type' => 'auth', 'signedIn' => true], 'Anmeldung: Kacheln bekommen das Signal auth');
 check($module->CompleteAuth('thecode') !== '', 'Rückruf: eine gestartete Anmeldung gilt nur einmal');
-check($module->timers['RefreshToken'] > 0 && $module->timers['Poll'] === 10000, 'Timer: Token-Erneuerung und Abfrage laufen');
+check($module->timers['RefreshToken'] > 0 && $module->timers['Poll'] === 60000, 'Timer: Token-Erneuerung läuft, Abfrage ohne Wiedergabe alle 60 s');
 
 // ── Rückrufseite ──
 $_GET = ['error' => 'access_denied'];
@@ -121,6 +121,30 @@ check($module->TransferPlayback('küche') && json_decode((string) end($module->h
 check(throws(fn () => $module->RequestAction('Device', 'x y'), InvalidArgumentException::class) && throws(fn () => $module->RequestAction('Nope', 1), InvalidArgumentException::class), 'RequestAction: ungültige Geräte-ID und unbekannter Ident abgelehnt');
 $module->responses = [$json(['is_playing' => false, 'item' => ['name' => 'Titel', 'artists' => [['name' => 'A'], ['name' => 'B']], 'album' => ['name' => 'Alb', 'images' => [['url' => 'https://i.scdn.co/x']]]], 'device' => ['id' => 'dev1', 'name' => 'Küche', 'volume_percent' => 40], 'shuffle_state' => true, 'repeat_state' => 'context'])];
 check($module->UpdateState() && $module->values['Artist'] === 'A, B' && $module->values['Volume'] === 40 && $module->values['Repeat'] === 1 && $module->values['Playback'] === 3 && $module->values['Device'] === 'Küche', 'UpdateState: Zustand des aktiven Geräts in den Variablen');
+
+// ── Abfragen sparsam: Kachel meldet, Leerlauf seltener, HTTP 429 ──
+IPS_SetProperty(12345, 'PollInterval', 15);
+IPS_ApplyChanges(12345);
+$module->http = [];
+$module->RequestAction('State', json_encode(['playing' => true, 'title' => 'Song']));
+$module->PollState();
+check($module->http === [] && $module->timers['Poll'] === 15000, 'Poll: frische Kachel-Meldung ersetzt die Abfrage; während der Wiedergabe der eingestellte Abstand');
+$module->buffers['TileReport'] = (string) (time() - 40);
+$module->responses = [$json(['is_playing' => false, 'item' => ['name' => 'T', 'artists' => [], 'album' => ['name' => 'A', 'images' => []]], 'device' => ['id' => 'dev1', 'name' => 'Küche']])];
+$module->PollState();
+check(count($module->http) === 1 && $module->values['Playback'] === 3 && $module->timers['Poll'] === 60000, 'Poll: ohne Kachel abgefragt; in der Pause höchstens alle 60 s');
+$module->http = [];
+$module->responses = [['status' => 429, 'body' => '', 'retryAfter' => 120]];
+check(!$module->UpdateState() && str_contains(end($module->logs), '120'), 'HTTP 429: Retry-After übernommen und geloggt');
+$module->PollState();
+check(count($module->http) === 1 && $module->timers['Poll'] >= 119000, 'HTTP 429: keine weiteren Abrufe, Timer wartet Retry-After ab');
+check(!$module->Play() && count($module->http) === 1, 'HTTP 429: auch Befehle warten, ohne Spotify anzufragen');
+$module->buffers['RateLimitUntil'] = '';
+$module->responses = [['status' => 429, 'body' => '']];
+$module->UpdateState();
+check((int) $module->buffers['RateLimitUntil'] - time() >= 29, 'HTTP 429 ohne Retry-After: mindestens 30 s Pause');
+$module->buffers['RateLimitUntil'] = '';
+$module->http = [];
 
 // ── Variablen ──
 $profiles = array_filter($module->variables, fn (array $v): bool => !is_array($v['presentation']) || !isset($v['presentation']['PRESENTATION']));

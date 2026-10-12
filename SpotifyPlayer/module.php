@@ -49,7 +49,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         parent::Create();
 
         $this->RegisterPropertyString('PlayerName', 'Symcon');
-        $this->RegisterPropertyInteger('PollInterval', 10);
+        $this->RegisterPropertyInteger('PollInterval', 15);
         $this->RegisterPropertyString('Favorites', '[]');
 
         $this->RegisterAttributeString('RefreshSecret', '');
@@ -62,7 +62,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->RegisterAttributeString('TileHash', '');
 
         $this->RegisterTimer('RefreshToken', 0, 'SPM_RefreshAccessToken($_IPS[\'TARGET\']);');
-        $this->RegisterTimer('Poll', 0, 'SPM_UpdateState($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('Poll', 0, 'SPM_PollState($_IPS[\'TARGET\']);');
         $this->RegisterTimer('PollOnce', 0, 'SPM_PollOnce($_IPS[\'TARGET\']);');
         // Favoriten aus der Kachel: die Property von außen übernehmen, denn ApplyChanges der
         // eigenen Instanz aus einer Modulfunktion heraus lehnt Symcon ab (re-entranter Aufruf).
@@ -125,7 +125,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             $this->SetStatus(self::STATUS_SIGNED_OUT);
         }
         $this->ScheduleRefresh();
-        $this->SetTimerInterval('Poll', $this->SignedIn() ? max(0, $this->ReadPropertyInteger('PollInterval')) * 1000 : 0);
+        $this->SchedulePoll();
     }
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
@@ -362,6 +362,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     {
         $this->SetTimerInterval('PollOnce', 0);
         $this->UpdateState();
+        $this->SchedulePoll();
     }
 
     /** Vom Timer ApplyFavorites aufgerufen: Favoritenliste samt neuer Einträge aus der Kachel. */
@@ -411,6 +412,8 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         if (!is_array($state)) {
             throw new InvalidArgumentException('Invalid state');
         }
+        // Frischer Zustand aus einer Kachel: der Timer Poll fragt dann selbst nicht ab
+        $this->SetBuffer('TileReport', (string) time());
         $text = static fn (mixed $v, int $max): string => is_string($v) ? mb_substr($v, 0, $max) : '';
         $playing = ($state['playing'] ?? false) === true;
         $hasItem = $text($state['title'] ?? '', 300) !== '';

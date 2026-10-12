@@ -76,8 +76,16 @@
   }
 
   // ── Web API ──
+  // Spotify zählt Abrufe je App (gleitendes 30-s-Fenster); bei HTTP 429 pausieren alle Kacheln des Fensters
+  const RATE_LIMIT_MIN = 30000;
+  function rateLimitError() {
+    const e = new Error('HTTP 429');
+    e.status = 429;
+    return e;
+  }
   async function call(method, path, query, body) {
     for (let attempt = 0; attempt < 2; attempt++) {
+      if ((slot().rateLimitUntil || 0) > Date.now()) throw rateLimitError();
       const t = await ensureToken();
       if (!t) { const e = new Error(T('Not signed in to Spotify')); e.status = 401; throw e; }
       const qs = query && Object.keys(query).length ? (path.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString() : '';
@@ -86,6 +94,13 @@
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       const res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
       if (res.status === 401 && attempt === 0) { token = ''; await requestToken(); continue; }
+      if (res.status === 429) {
+        // Retry-After gibt Spotify nicht jedem Ursprung frei: dann mindestens 30 s
+        const wait = Math.max(RATE_LIMIT_MIN, (parseInt(res.headers.get('Retry-After'), 10) || 0) * 1000);
+        slot().rateLimitUntil = Date.now() + wait;
+        debug('api ' + method + ' ' + path + ' -> 429, pause ' + Math.round(wait / 1000) + ' s');
+        throw rateLimitError();
+      }
       if (res.status === 204 || res.status === 202) return {};
       const text = await res.text();
       let data = {};
@@ -246,7 +261,8 @@
     return { playing: false, position: 0, duration: 0, at: Date.now(), item: null, shuffle: false, repeat: 0, volume: null, context: '', deviceId: '', deviceName: '', deviceType: '', local: false };
   }
 
-  // Aktives Gerät alle 5 s abfragen (30 s, solange der SDK-Player selbst spielt); nur bei sichtbarer Kachel
+  // Aktives Gerät alle 10 s abfragen (30 s, solange der SDK-Player selbst spielt; der Fortschritt läuft
+  // dazwischen in player.js weiter) und kurz nach dem erwarteten Titelende; nur bei sichtbarer Kachel
   let polling = false;
   async function poll() {
     if (polling || document.visibilityState === 'hidden' || !token) return;
@@ -263,9 +279,16 @@
     polling = false;
   }
   let pollTimer = 0;
+  function nextPoll() {
+    const every = local ? 30000 : 10000;
+    if (local || !remote || !remote.is_playing || !remote.item) return every;
+    const left = (remote.item.duration_ms || 0) - (remote.progress_ms || 0) - (Date.now() - remoteAt);
+    return left > 0 && left < every ? left + 1500 : every;
+  }
   function schedulePoll(delay) {
     clearTimeout(pollTimer);
-    pollTimer = setTimeout(async () => { await poll(); schedulePoll(local ? 30000 : 5000); }, delay);
+    const pause = (slot().rateLimitUntil || 0) - Date.now();
+    pollTimer = setTimeout(async () => { await poll(); schedulePoll(nextPoll()); }, Math.max(delay, pause));
   }
 
   async function listDevices() {
@@ -435,10 +458,12 @@
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
     await poll();
-    schedulePoll(local ? 30000 : 5000);
+    schedulePoll(nextPoll());
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') schedulePoll(0); });
     report(true);
-    setInterval(() => report(true), 30000);
+    // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar
+    // (Abfrage läuft) oder mit spielendem SDK-Player (Ereignisse)
+    setInterval(() => { if (document.visibilityState === 'visible' || local) report(true); }, 30000);
   }
 
   window.AMP = {

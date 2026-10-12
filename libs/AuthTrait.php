@@ -184,17 +184,24 @@ trait MusicPlayerSpotifyAuthTrait
 
     /**
      * HTTP-Aufruf (Symcon-Dienst und Web API); in Tests überschreibbar.
-     * @return array{status: int, body: string}
+     * @return array{status: int, body: string, retryAfter?: int}
      */
     protected function Http(string $Method, string $Url, array $Headers, ?string $Body): array
     {
         $ch = curl_init($Url);
+        $retryAfter = 0;
         $options = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 10,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_CUSTOMREQUEST  => $Method,
             CURLOPT_HTTPHEADER     => array_merge(['Accept: application/json'], $Headers),
+            CURLOPT_HEADERFUNCTION => static function ($ch, string $line) use (&$retryAfter): int {
+                if (stripos($line, 'Retry-After:') === 0) {
+                    $retryAfter = max(0, (int) trim(substr($line, 12)));
+                }
+                return strlen($line);
+            },
         ];
         if ($Body !== null) {
             $options[CURLOPT_POSTFIELDS] = $Body;
@@ -211,6 +218,6 @@ trait MusicPlayerSpotifyAuthTrait
         if (!is_string($body)) {
             throw new RuntimeException('Not reachable: ' . curl_error($ch));
         }
-        return ['status' => $status, 'body' => strlen($body) > 1048576 ? '' : $body];
+        return ['status' => $status, 'body' => strlen($body) > 1048576 ? '' : $body, 'retryAfter' => $retryAfter];
     }
 }
