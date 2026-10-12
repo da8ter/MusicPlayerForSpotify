@@ -1,6 +1,7 @@
 /* Musikplayer für Spotify – Inhalte der Bereiche: Start (zuletzt gehört, Top-Künstler, Top-Titel,
    eigene Playlists, gespeicherte Alben, gefolgte Künstler), Neu (Spotifys Neuerscheinungen, neue
-   Alben der eigenen Künstler, zuletzt gespeichert) und die Mediathek mit ihren Kategorien.
+   Alben der eigenen Künstler, zuletzt gespeichert), Entdecken (beliebte Playlists, Kategorien) und
+   die Mediathek mit ihren Kategorien.
    Bausteine kommen aus ui.js (window.AMPUI). */
 (function () {
   'use strict';
@@ -69,6 +70,55 @@
     });
   }
 
+  // ── Entdecken: Spotifys beliebte Playlists und die Browse-Kategorien (Charts, Stimmung, Genres …) ──
+  // Spotify liefert Namen und Bilder in der Sprache aus locale; ohne sie kommt Englisch.
+  const locale = () => String(navigator.language || 'en-US').replace('-', '_');
+  const playlistsOf = data => ((data.playlists && data.playlists.items) || []).filter(Boolean);
+  function discover() {
+    ui.page(T('Discover'));
+    if (ui.notSignedIn()) return;
+    ui.load(async current => {
+      const [featured, categories] = await Promise.all([
+        AMP.api('/v1/browse/featured-playlists', { limit: 20, locale: locale() }).catch(() => ({})),
+        AMP.api('/v1/browse/categories', { limit: 50, locale: locale() }).catch(() => ({})),
+      ]);
+      if (!current()) return;
+      let any = ui.section(T('Popular playlists'), playlistsOf(featured), 'shelf');
+      const list = ((categories.categories && categories.categories.items) || []).filter(c => c && c.id);
+      if (list.length) {
+        const h = document.createElement('h3');
+        h.textContent = T('Browse all');
+        $('panel').appendChild(h);
+        const box = document.createElement('div');
+        box.className = 'grid';
+        list.forEach(c => box.appendChild(categoryCard(c)));
+        $('panel').appendChild(box);
+        any = true;
+      }
+      if (!any) ui.renderList([], T('No results'));
+    });
+  }
+
+  // Kategorie als Kachel; ein Tipp öffnet ihre Playlists
+  function categoryCard(c) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const art = AMP.artwork(c.icons, 300);
+    card.innerHTML = '<button class="card-art thumb noplay"' + (art ? ' style="background-image:url(&quot;' + esc(art) + '&quot;)"' : '') + ' aria-label="' + esc(c.name) + '"></button>'
+      + '<button class="card-txt"><b>' + esc(c.name) + '</b></button>';
+    card.querySelector('.card-art').onclick = card.querySelector('.card-txt').onclick = () => showCategory(c);
+    return card;
+  }
+
+  function showCategory(c) {
+    ui.page(c.name || '', 'discover', true);
+    ui.load(async current => {
+      const data = await AMP.api('/v1/browse/categories/' + encodeURIComponent(c.id) + '/playlists', { limit: 50, locale: locale() });
+      if (!current()) return;
+      if (!ui.section('', playlistsOf(data), 'grid')) ui.renderList([], T('No results'));
+    });
+  }
+
   // ── Mediathek: Kategorien wie in der App, darunter die Playlists ──
   const CATEGORIES = ['playlists', 'artists', 'albums', 'songs', 'recent', 'favorites'];
   function library() {
@@ -134,7 +184,7 @@
   }
 
   window.AMPViews = {
-    home, new: fresh, library, favorites,
+    home, new: fresh, discover, library, favorites,
     playlists: () => category('playlists'),
     artists: () => category('artists'),
     albums: () => category('albums'),

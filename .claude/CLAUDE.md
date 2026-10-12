@@ -7,12 +7,12 @@ Betriebsdaten dieses Rechners (Testinstanz, Client-ID) stehen in `CLAUDE.local.m
 ## Aufbau
 
 - **`SpotifyPlayer/`**: einziges Modul „Music Player For Spotify“, Klasse `MusicPlayerForSpotify`, Anzeigename über locale.json „Musikplayer für Spotify“, Präfix `SPM`, `IPSModuleStrict`.
-- **Kachel:** `module.html` ist ein Gerüst; `GetVisualizationTile` setzt `assets/player.css` + `layout.css`, die Skripte und die Startdaten (`SPM_CONFIG`) per `strtr` ein. Aufbau wie die Musik-Apps: Start, Neu, Mediathek, Suchen; unter 720 px Reiter unten mit Mini-Player, darüber Seitenleiste (`html.wide`); sehr kleine Kacheln nur Cover und Steuerung (`html.compact`). `AMP.start()` steht als letztes Skript. Die JS-Namen `AMP*` sind vom Apple-Modul geerbt und bewusst gleich geblieben (gemeinsamer Code).
+- **Kachel:** `module.html` ist ein Gerüst; `GetVisualizationTile` setzt `assets/player.css` + `layout.css`, die Skripte und die Startdaten (`SPM_CONFIG`) per `strtr` ein. Aufbau wie die Musik-Apps: Start, Neu, Entdecken, Mediathek, Suchen; unter 720 px Reiter unten mit Mini-Player, darüber Seitenleiste (`html.wide`); sehr kleine Kacheln nur Cover und Steuerung (`html.compact`). `AMP.start()` steht als letztes Skript. Die JS-Namen `AMP*` sind vom Apple-Modul geerbt und bewusst gleich geblieben (gemeinsamer Code).
   - `core.js`: SDK-Player laden (im Browser im Visu-Hauptfenster, sonst in der Kachel; iOS ohne SDK), Web API mit Token-Nachforderung bei 401, Zustand (SDK oder abgefragtes Connect-Gerät, Abfrage alle 5 s bei sichtbarer Kachel), Befehle, Meldung an Symcon.
   - `icons.js`: Font Awesome Light aus `/icons.js` der Visu, Spotify-Logo aus den Brands (`fab`).
   - `nav.js`, `scroll.js`, `player.css`, `layout.css`: wie im Apple-Modul.
   - `ui.js`: Navigation, Listen, Kacheln, Suche (`/v1/search`), Seitenwechsel; `window.AMPUI`.
-  - `views.js`: Start (recently-played, top artists/tracks, eigene Playlists, Alben, Künstler), Neu (new-releases, neue Alben der eigenen Künstler, zuletzt gespeichert), Mediathek-Kategorien mit `next`-Seiten.
+  - `views.js`: Start (recently-played, top artists/tracks, eigene Playlists, Alben, Künstler), Neu (new-releases, neue Alben der eigenen Künstler, zuletzt gespeichert), Entdecken (featured-playlists, browse/categories mit `locale` aus `navigator.language`, Kategorie-Seite mit categories/{id}/playlists), Mediathek-Kategorien mit `next`-Seiten.
   - `details.js`: Künstler (top-tracks, Rückfall Suche; albums mit `limit` 50), Album/Playlist mit Trackliste (`apiAll` folgt `next`), Album des laufenden Titels.
   - `actions.js`: Warteschlange, Playlists (anlegen, befüllen, umbenennen, Titel entfernen, löschen), Mediathek/Folgen, Kachel-Favoriten.
   - `player.js`: Mini-Player, „Läuft gerade“, Warteschlange (`/v1/me/player/queue`, nur lesend), Geräteauswahl (Connect), Gefällt mir.

@@ -11,7 +11,7 @@
     search: 'magnifying-glass', clear: 'xmark', back: 'chevron-left', check: 'check', more: 'ellipsis',
     forward: 'chevron-right', down: 'chevron-down', queue: 'list-ul', stream: 'airplay',
     // Reiter und Seitenleiste
-    home: 'house', new: 'grid-2', library: 'album-collection',
+    home: 'house', new: 'grid-2', discover: 'compass', library: 'album-collection',
     albums: 'album', artists: 'microphone-stand', playlists: 'list-music', songs: 'heart', recent: 'clock-rotate-left', favorites: 'bookmark',
     // Geräte (Spotify Connect)
     laptop: 'laptop', mobile: 'mobile', tablet: 'tablet', speaker: 'speaker', tv: 'tv', gamepad: 'gamepad', car: 'car', house: 'house',

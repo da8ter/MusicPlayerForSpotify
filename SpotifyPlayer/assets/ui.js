@@ -1,5 +1,5 @@
-/* Musikplayer für Spotify – Oberfläche, aufgebaut wie die Musik-Apps: Start, Neu, Mediathek und
-   Suchen; schmal als Reiter unten (iPhone), breit als Seitenleiste (iPad). Hier liegen Navigation,
+/* Musikplayer für Spotify – Oberfläche, aufgebaut wie die Musik-Apps: Start, Neu, Entdecken,
+   Mediathek und Suchen; schmal als Reiter unten (iPhone), breit als Seitenleiste (iPad). Hier liegen Navigation,
    Listen, Kacheln und Suche; die Inhalte der Bereiche kommen aus views.js, der Player aus player.js. */
 (function () {
   'use strict';
@@ -12,10 +12,10 @@
   const fmt = sec => { sec = Math.max(0, Math.floor(sec || 0)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
   // Ab dieser Breite Seitenleiste statt Reiter (wie die Musik-Apps auf dem iPad)
   const WIDE = 720;
-  const TABS = ['home', 'new', 'library'];
+  const TABS = ['home', 'new', 'discover', 'library'];
   const LIBRARY = ['playlists', 'artists', 'albums', 'songs', 'recent', 'favorites'];
   const LABELS = {
-    home: 'Home', new: 'New', library: 'Library', search: 'Search', playlists: 'Playlists', artists: 'Artists',
+    home: 'Home', new: 'New', discover: 'Discover', library: 'Library', search: 'Search', playlists: 'Playlists', artists: 'Artists',
     albums: 'Albums', songs: 'Liked Songs', recent: 'Recently played', favorites: 'Favorites',
   };
   let view = 'home';
@@ -193,9 +193,11 @@
     const list = (resources || []).filter(r => r && TYPES[r.type] && r.id);
     if (!list.length) return false;
     const host = target || $('panel');
-    const h = document.createElement('h3');
-    h.textContent = title;
-    host.appendChild(h);
+    if (title) {
+      const h = document.createElement('h3');
+      h.textContent = title;
+      host.appendChild(h);
+    }
     if (layout === 'list') {
       const holder = document.createElement('div');
       host.appendChild(holder);
@@ -224,15 +226,16 @@
   // „⋯“ innerhalb einer Zeile (die Zeile ist selbst ein Knopf, deshalb ein span)
   const moreButton = () => '<span class="more" role="button" aria-label="' + esc(T('More')) + '">' + svg('more') + '</span>';
 
-  // Neue Seite: Inhalt leeren, Zurück-Knopf (schmal, aus einer Mediathek-Kategorie) und großer Titel
-  function page(title, backTo) {
+  // Neue Seite: Inhalt leeren, Zurück-Knopf (schmal aus einer Mediathek-Kategorie; always: auch breit,
+  // für Unterseiten ohne eigenen Eintrag in der Seitenleiste) und großer Titel
+  function page(title, backTo, always) {
     const panel = $('panel');
     panel.classList.remove('detail');
     if (window.AMPDetails) window.AMPDetails.reset();
     panel.onscroll = null;
     panel.innerHTML = '';
     panel.scrollTop = 0;
-    if (backTo && !wide) {
+    if (backTo && (!wide || always)) {
       const back = document.createElement('button');
       back.className = 'back';
       back.innerHTML = svg('back') + '<span>' + esc(T(LABELS[backTo])) + '</span>';
@@ -362,7 +365,7 @@
     if (wide) {
       const library = LIBRARY.filter(key => key !== 'favorites' || cfg.favorites.length);
       const groups = [
-        { items: ['home', 'new'].map(key => ({ key, label: T(LABELS[key]), icon: key })) },
+        { items: ['home', 'new', 'discover'].map(key => ({ key, label: T(LABELS[key]), icon: key })) },
         { title: T('Library'), items: library.map(key => ({ key, label: T(LABELS[key]), icon: key })) },
       ];
       if (sidePlaylists && sidePlaylists.length) groups.push({ title: T('Playlists'), items: sidePlaylists });
