@@ -1,12 +1,15 @@
 /* Musikplayer für Spotify – Kern: Web Playback SDK laden, Web API aufrufen, Befehle ausführen,
    Zustand melden. Im Browser läuft der SDK-Player einmal im Visu-Hauptfenster (gleicher Ursprung),
    damit die Musik einen Kategoriewechsel übersteht; die Kachel ist dann nur Bedienoberfläche.
-   Spielt ein anderes Spotify-Connect-Gerät, zeigt die Kachel dessen Zustand (Abfrage alle 5 s)
+   Spielt ein anderes Spotify-Connect-Gerät, zeigt die Kachel dessen Zustand (Abfrage alle 10 s)
    und steuert es über die Web API. Auf iPhone und iPad gibt es kein SDK; dort nur Fernsteuerung. */
 (function () {
   'use strict';
   const cfg = window.SPM_CONFIG || {};
-  const SLOT = '__symconSpotifyPlayer';
+  // Ein Slot je Instanz: zwei Instanzen (zwei Spotify-Konten) auf einer Seite teilen weder Player noch Token
+  const SLOT = '__symconSpotifyPlayer' + (/^\d+$/.test(String(cfg.instance || '')) ? '_' + cfg.instance : '');
+  // Das SDK-Skript gibt es je Fenster nur einmal, auch für mehrere Instanzen
+  const SDK_FLAG = '__symconSpotifySdk';
   const SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
   const API = 'https://api.spotify.com';
   const ITEM_TYPES = ['track', 'album', 'playlist', 'artist'];
@@ -185,11 +188,15 @@
   function inject(s) {
     s.state = 'loading';
     s.loadingSince = Date.now();
-    win.onSpotifyWebPlaybackSDKReady = new win.Function('window["' + SLOT + '"].sdkReady = true;');
+    if (win.Spotify && win.Spotify.Player) win[SDK_FLAG] = 'ready';
+    if (win[SDK_FLAG] === 'ready' || (win[SDK_FLAG] === 'loading' && Date.now() - (win[SDK_FLAG + 'Since'] || 0) < 15000)) return;
+    win[SDK_FLAG] = 'loading';
+    win[SDK_FLAG + 'Since'] = Date.now();
+    win.onSpotifyWebPlaybackSDKReady = new win.Function('window["' + SDK_FLAG + '"] = "ready";');
     const el = win.document.createElement('script');
     el.src = SDK_URL;
     el.async = true;
-    on(el, 'error', () => { s.state = 'error'; s.error = 'script'; });
+    on(el, 'error', () => { s.state = 'error'; s.error = 'script'; win[SDK_FLAG] = ''; });
     win.document.head.appendChild(el);
   }
 
@@ -201,7 +208,7 @@
     for (let i = 0; i < 300; i++) {
       if (s.state === 'ready') return s.player;
       if (s.state === 'error') throw new Error(s.error);
-      if (s.state === 'loading' && s.sdkReady && win.Spotify && win.Spotify.Player) {
+      if (s.state === 'loading' && win[SDK_FLAG] === 'ready' && win.Spotify && win.Spotify.Player) {
         s.state = 'configuring';
         try {
           const options = new win.Object();
@@ -266,15 +273,26 @@
   }
 
   // Aktives Gerät alle 10 s abfragen (30 s, solange der SDK-Player selbst spielt; der Fortschritt läuft
-  // dazwischen in player.js weiter) und kurz nach dem erwarteten Titelende; nur bei sichtbarer Kachel
+  // dazwischen in player.js weiter) und kurz nach dem erwarteten Titelende; nur bei sichtbarer Kachel.
+  // Mehrere Kacheln einer Instanz im selben Fenster teilen sich das Ergebnis (als Text im Slot, damit
+  // das Hauptfenster keine Objekte einer verworfenen Kachel hält).
+  const SHARED_POLL = 8000;
   let polling = false;
   async function poll() {
     if (polling || document.visibilityState === 'hidden' || !token) return;
     polling = true;
     try {
-      const data = await call('GET', '/v1/me/player', { additional_types: 'track,episode' });
-      remote = data && data.device ? data : null;
-      remoteAt = Date.now();
+      const s = slot();
+      if (s.remoteAt && Date.now() - s.remoteAt < SHARED_POLL) {
+        remote = JSON.parse(s.remoteJson || 'null');
+        remoteAt = s.remoteAt;
+      } else {
+        const data = await call('GET', '/v1/me/player', { additional_types: 'track,episode' });
+        remote = data && data.device ? data : null;
+        remoteAt = Date.now();
+        s.remoteJson = JSON.stringify(remote);
+        s.remoteAt = remoteAt;
+      }
       // Spielt ein anderes Gerät, ist der SDK-Zustand veraltet
       if (remote && remote.device.id !== slot().deviceId) local = null;
       emit('state');
@@ -345,7 +363,8 @@
   // Liefert true bei Erfolg; Fehler zeigt die Kachel als Hinweis.
   function run(command, args) {
     return Promise.resolve().then(() => perform(command, args || {})).then(() => {
-      // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst)
+      // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt
+      slot().remoteAt = 0;
       schedulePoll(command === 'volume' ? 1500 : 600);
       return true;
     }, e => {

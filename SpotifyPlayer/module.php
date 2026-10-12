@@ -171,6 +171,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         }
         $config = [
             'mode'        => $signedIn ? 'player' : ($this->ConnectURL() === '' ? 'setup' : 'login'),
+            'instance'    => $this->InstanceID,
             // Sichtbar für jeden mit Zugang zur Visualisierung: dieselben Personen bedienen den Player.
             'accessToken' => $signedIn ? $this->AccessToken(true) : '',
             'expiresAt'   => $signedIn ? $this->ReadAttributeInteger('AccessExpiry') : 0,

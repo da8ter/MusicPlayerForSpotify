@@ -41,6 +41,7 @@ Umfang und Handprobe: `tests/README.md`. Prüfstand mit Beispieldaten (Chrome oh
 - **Playlists:** eigene (owner = UserID) oder gemeinsame lassen sich bearbeiten; `fields`-Parameter bei `/playlists/{id}/tracks` klein halten; `items[].track` kann null oder eine Episode sein.
 - **Geräte:** Befehle brauchen ein Gerät (`NO_ACTIVE_DEVICE` sonst); Reihenfolge aktiv → Kachel-Gerät (`TileDevice`-Puffer aus `State`) → erstes gelistetes; `WantedDevice` aus `RequestAction('Device')` bzw. `TransferPlayback` geht vor.
 - **Kein `IPS_ApplyChanges($this->InstanceID)` aus der eigenen Instanz** (re-entrant); Favoriten aus der Kachel über den Timer `ApplyFavorites`.
+- **Slot im Hauptfenster je Instanz** (`__symconSpotifyPlayer_<ID>`, `cfg.instance`): zwei Instanzen mit verschiedenen Konten auf einer Seite teilen weder Player noch Token, Zwischenspeicher oder 429-Pause; das SDK-Skript lädt je Fenster einmal (`__symconSpotifySdk`). Kacheln einer Instanz im selben Fenster teilen das Ergebnis von `/me/player` 8 s lang (`remoteJson`/`remoteAt` als Text im Slot; ein Befehl setzt `remoteAt` zurück).
 - **Objekte im Hauptfenster** als Objekte des Hauptfensters anlegen (`new win.Object()`, `new win.Function()` für SDK-Rückrufe), Listener bei `pagehide` abmelden.
 - **Commits:** deutsche Botschaft, ein Thema je Commit, **ohne** Co-Authored-By-Zeile; Prüfungen vorher.
 - **Nie** `git checkout`/`git restore` auf Dateien.
