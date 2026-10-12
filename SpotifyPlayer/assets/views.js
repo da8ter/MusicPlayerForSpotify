@@ -73,7 +73,19 @@
   // ── Entdecken: Spotifys beliebte Playlists und die Browse-Kategorien (Charts, Stimmung, Genres …) ──
   // Spotify liefert Namen und Bilder in der Sprache aus locale; ohne sie kommt Englisch.
   const locale = () => String(navigator.language || 'en-US').replace('-', '_');
-  const playlistsOf = data => ((data.playlists && data.playlists.items) || []).filter(Boolean);
+  const playlistsOf = data => ((data.playlists && data.playlists.items) || []).filter(p => p && p.id);
+  // Persönliche Mixe kommen in Kategorien oft nur als Platzhalter (Name leer, Bild ohne Adresse);
+  // einzeln abgefragt liefert Spotify sie vollständig. Nur die Platzhalter nachladen.
+  const hasArt = p => (p.images || []).some(i => i && i.url);
+  async function completePlaylists(list) {
+    return Promise.all(list.map(async p => {
+      if (p.name && hasArt(p)) return p;
+      try {
+        const full = await AMP.api('/v1/playlists/' + encodeURIComponent(p.id), { fields: 'id,uri,type,name,description,images,owner(id,display_name)' });
+        return Object.assign({}, p, full);
+      } catch (e) { return p; }
+    }));
+  }
   function discover() {
     ui.page(T('Discover'));
     if (ui.notSignedIn()) return;
@@ -83,7 +95,9 @@
         AMP.api('/v1/browse/categories', { limit: 50, locale: locale() }).catch(() => ({})),
       ]);
       if (!current()) return;
-      let any = ui.section(T('Popular playlists'), playlistsOf(featured), 'shelf');
+      const popular = await completePlaylists(playlistsOf(featured));
+      if (!current()) return;
+      let any = ui.section(T('Popular playlists'), popular, 'shelf');
       const list = ((categories.categories && categories.categories.items) || []).filter(c => c && c.id);
       if (list.length) {
         const h = document.createElement('h3');
@@ -115,7 +129,9 @@
     ui.load(async current => {
       const data = await AMP.api('/v1/browse/categories/' + encodeURIComponent(c.id) + '/playlists', { limit: 50, locale: locale() });
       if (!current()) return;
-      if (!ui.section('', playlistsOf(data), 'grid')) ui.renderList([], T('No results'));
+      const list = await completePlaylists(playlistsOf(data));
+      if (!current()) return;
+      if (!ui.section('', list, 'grid')) ui.renderList([], T('No results'));
     });
   }
 
