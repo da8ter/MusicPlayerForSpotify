@@ -75,16 +75,17 @@
   const locale = () => String(navigator.language || 'en-US').replace('-', '_');
   const playlistsOf = data => ((data.playlists && data.playlists.items) || []).filter(p => p && p.id);
   // Persönliche Mixe kommen in Kategorien oft nur als Platzhalter (Name leer, Bild ohne Adresse);
-  // einzeln abgefragt liefert Spotify sie vollständig. Nur die Platzhalter nachladen.
+  // einzeln abgefragt liefert Spotify sie vollständig. Nur die Platzhalter nachladen; was danach noch
+  // keinen Namen hat, ist ein leerer Mix (keine Titel) und entfällt.
   const hasArt = p => (p.images || []).some(i => i && i.url);
   async function completePlaylists(list) {
-    return Promise.all(list.map(async p => {
+    return (await Promise.all(list.map(async p => {
       if (p.name && hasArt(p)) return p;
       try {
         const full = await AMP.api('/v1/playlists/' + encodeURIComponent(p.id), { fields: 'id,uri,type,name,description,images,owner(id,display_name)' });
         return Object.assign({}, p, full);
       } catch (e) { return p; }
-    }));
+    }))).filter(p => p.name);
   }
   function discover() {
     ui.page(T('Discover'));
