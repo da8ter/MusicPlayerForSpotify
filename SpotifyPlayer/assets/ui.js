@@ -415,7 +415,7 @@
   function showLogin() {
     $('login').hidden = signedIn();
     if (signedIn()) return;
-    $('loginText').textContent = T(cfg.mode === 'setup' ? 'Enter the Client ID in the instance first' : 'Not signed in to Spotify');
+    $('loginText').textContent = T(cfg.mode === 'setup' ? 'Signing in needs an active Symcon Connect' : 'Not signed in to Spotify');
     $('bLogin').hidden = cfg.mode !== 'login';
     $('bLogin').textContent = T('Sign in with Spotify');
     $('bLogin').onclick = () => AMP.login();

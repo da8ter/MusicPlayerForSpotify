@@ -11,7 +11,7 @@ require_once __DIR__ . '/../libs/VariablesTrait.php';
 /**
  * Musikplayer für Spotify als Kachel: das Web Playback SDK spielt im Browser (im Visu-Hauptfenster,
  * damit die Musik einen Kategoriewechsel übersteht), die Web API steuert jedes Spotify-Connect-Gerät.
- * Das Modul hält die Anmeldung (OAuth mit PKCE), spiegelt den Zustand in Variablen und führt
+ * Das Modul hält die Anmeldung (über den OAuth-Dienst von Symcon), spiegelt den Zustand in Variablen und führt
  * Befehle aus Skripten direkt über die Web API aus; dafür muss keine Kachel offen sein.
  */
 class MusicPlayerForSpotify extends IPSModuleStrict
@@ -20,15 +20,14 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     use MusicPlayerSpotifyApiTrait;
     use MusicPlayerSpotifyVariablesTrait;
 
-    private const MODULE_GUID = '{E52C1561-E92E-4C39-9EDE-988A9285B8A1}';
-    private const STATUS_NO_CLIENT = 201;
+    private const STATUS_NO_CONNECT = 201;
     private const STATUS_SIGNED_OUT = 202;
     private const PLAYBACK_COMMANDS = [0 => 'previous', 1 => 'pause', 2 => 'play', 3 => 'pause', 4 => 'next'];
     private const REFRESH_MIN_INTERVAL = 20;
 
     // Texte der Kachel, übersetzt über locale.json
     private const TILE_TEXTS = [
-        'Sign in with Spotify', 'Not signed in to Spotify', 'Enter the Client ID in the instance first',
+        'Sign in with Spotify', 'Not signed in to Spotify', 'Signing in needs an active Symcon Connect',
         'Sign-in window blocked: allow pop-ups for this page', 'Sign-in expired. Please sign in again.',
         'Spotify Premium is required for playback', 'Spotify could not be loaded',
         'Home', 'New', 'Library', 'Search', 'Favorites', 'Playlists', 'Albums', 'Artists', 'Liked Songs', 'Recently played',
@@ -49,8 +48,6 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     {
         parent::Create();
 
-        $this->RegisterPropertyString('ClientID', '');
-        $this->RegisterPropertyString('RedirectBase', '');
         $this->RegisterPropertyString('PlayerName', 'Symcon');
         $this->RegisterPropertyInteger('PollInterval', 10);
         $this->RegisterPropertyString('Favorites', '[]');
@@ -61,6 +58,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->RegisterAttributeString('UserID', '');
         $this->RegisterAttributeString('UserName', '');
         $this->RegisterAttributeString('Product', '');
+        $this->RegisterAttributeString('TokenSource', '');
         $this->RegisterAttributeString('TileHash', '');
 
         $this->RegisterTimer('RefreshToken', 0, 'SPM_RefreshAccessToken($_IPS[\'TARGET\']);');
@@ -69,7 +67,6 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         // Favoriten aus der Kachel: die Property von außen übernehmen, denn ApplyChanges der
         // eigenen Instanz aus einer Modulfunktion heraus lehnt Symcon ab (re-entranter Aufruf).
         $this->RegisterTimer('ApplyFavorites', 0, 'IPS_SetProperty($_IPS[\'TARGET\'], \'Favorites\', SPM_TakePendingFavorites($_IPS[\'TARGET\'])); IPS_ApplyChanges($_IPS[\'TARGET\']);');
-        $this->RegisterHook(self::HOOK);
         $this->SetVisualizationType(defined('INSTANCE_VISUALIZATION_TYPE_HTML_FULLSCREEN') ? INSTANCE_VISUALIZATION_TYPE_HTML_FULLSCREEN : 1);
     }
 
@@ -82,13 +79,13 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             return;
         }
 
-        $this->RegisterHook(self::HOOK);
         $this->RegisterVariables();
+        $this->MigrateOwnApp();
         $this->ApplySignedIn();
 
         // Kacheln nur neu laden, wenn sich etwas für sie geändert hat; geänderte Favoriten gehen als
         // Nachricht hinaus (ein Favorit aus der Kachel soll nicht alle Geräte neu laden).
-        $tileHash = hash('sha256', json_encode([trim($this->ReadPropertyString('ClientID')), $this->ReadPropertyString('PlayerName'), $this->SignedIn()]));
+        $tileHash = hash('sha256', json_encode([$this->ConnectURL() !== '', $this->ReadPropertyString('PlayerName'), $this->SignedIn()]));
         $previous = $this->ReadAttributeString('TileHash');
         $favorites = $this->Favorites();
         $favoritesHash = hash('sha256', json_encode($favorites));
@@ -100,15 +97,32 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         }
     }
 
+    /**
+     * Bis Oktober 2026 meldete sich das Modul über eine eigene Spotify-App des Nutzers an (Client ID, Hook
+     * /hook/spotifyplayer). Deren Token lassen sich beim Symcon-Dienst nicht erneuern: verwerfen und den Hook abmelden.
+     */
+    private function MigrateOwnApp(): void
+    {
+        if ($this->SignedIn() && $this->ReadAttributeString('TokenSource') !== self::OAUTH_ID) {
+            $this->ClearTokens();
+            $this->ClearState();
+        }
+        try {
+            $this->UnregisterHook('spotifyplayer');
+        } catch (\Throwable $e) {
+            // war nicht registriert
+        }
+    }
+
     /** Status und Timer nach Anmeldung, Abmeldung oder Übernehmen */
     private function ApplySignedIn(): void
     {
-        if (trim($this->ReadPropertyString('ClientID')) === '') {
-            $this->SetStatus(self::STATUS_NO_CLIENT);
-        } elseif (!$this->SignedIn()) {
-            $this->SetStatus(self::STATUS_SIGNED_OUT);
-        } else {
+        if ($this->SignedIn()) {
             $this->SetStatus(IS_ACTIVE);
+        } elseif ($this->ConnectURL() === '') {
+            $this->SetStatus(self::STATUS_NO_CONNECT);
+        } else {
+            $this->SetStatus(self::STATUS_SIGNED_OUT);
         }
         $this->ScheduleRefresh();
         $this->SetTimerInterval('Poll', $this->SignedIn() ? max(0, $this->ReadPropertyInteger('PollInterval')) * 1000 : 0);
@@ -129,15 +143,13 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     public function GetConfigurationForm(): string
     {
         $form = json_decode((string) file_get_contents(__DIR__ . '/form.json'), true);
-        $redirect = $this->GetRedirectURI();
         foreach ($form['actions'] as &$action) {
-            if (($action['name'] ?? '') === 'RedirectInfo') {
-                $action['caption'] = $redirect !== ''
-                    ? sprintf($this->Translate('Redirect URI for the Spotify app: %s'), $redirect)
-                    : $this->Translate('No Connect address found: enter the public base address (https) above');
+            if (($action['name'] ?? '') === 'ConnectInfo') {
+                $action['caption'] = $this->ConnectURL() !== '' ? '' : $this->Translate('Signing in needs an active Symcon Connect');
+                $action['visible'] = $action['caption'] !== '';
             }
             if (($action['name'] ?? '') === 'LoginInfo') {
-                // Die Abo-Art (product) liefert Spotify Dev-Mode-Apps seit Februar 2026 nicht mehr
+                // Die Abo-Art (product) liefert Spotify nicht jeder App (Dev Mode seit Februar 2026)
                 $product = $this->ReadAttributeString('Product');
                 $action['caption'] = $this->SignedIn()
                     ? sprintf($this->Translate('Signed in to Spotify as %s'), $this->ReadAttributeString('UserName') . ($product !== '' ? ' (' . $product . ')' : ''))
@@ -150,14 +162,13 @@ class MusicPlayerForSpotify extends IPSModuleStrict
 
     public function GetVisualizationTile(): string
     {
-        $clientId = trim($this->ReadPropertyString('ClientID'));
-        $signedIn = $clientId !== '' && $this->SignedIn();
+        $signedIn = $this->SignedIn();
         $texts = [];
         foreach (self::TILE_TEXTS as $text) {
             $texts[$text] = $this->Translate($text);
         }
         $config = [
-            'mode'        => $clientId === '' ? 'setup' : ($signedIn ? 'player' : 'login'),
+            'mode'        => $signedIn ? 'player' : ($this->ConnectURL() === '' ? 'setup' : 'login'),
             // Sichtbar für jeden mit Zugang zur Visualisierung: dieselben Personen bedienen den Player.
             'accessToken' => $signedIn ? $this->AccessToken(true) : '',
             'expiresAt'   => $signedIn ? $this->ReadAttributeInteger('AccessExpiry') : 0,
@@ -183,24 +194,13 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         ]);
     }
 
-    /** Rückruf von Spotify nach der Anmeldung (/hook/spotifyplayer?code=…&state=<Instanz>.<Zufall>) */
-    protected function ProcessHookData(): void
+    /** Rückruf von Spotify über den Symcon-Dienst und Connect (?code=…), nur bei der Instanz, die die Anmeldung gestartet hat */
+    protected function ProcessOAuthData(): void
     {
-        $code = (string) ($_GET['code'] ?? '');
-        $state = (string) ($_GET['state'] ?? '');
         $error = (string) ($_GET['error'] ?? '');
-        if ($error !== '') {
-            $message = $this->Translate('Sign-in failed') . ': ' . mb_substr($error, 0, 100);
-        } else {
-            $target = (int) strtok($state, '.');
-            if ($target === $this->InstanceID) {
-                $message = $this->CompleteAuth($code, $state);
-            } elseif ($target > 0 && IPS_InstanceExists($target) && IPS_GetInstance($target)['ModuleInfo']['ModuleID'] === self::MODULE_GUID) {
-                $message = SPM_CompleteAuth($target, $code, $state);
-            } else {
-                $message = $this->Translate('Sign-in rejected: unknown or expired request');
-            }
-        }
+        $message = $error !== ''
+            ? $this->Translate('Sign-in failed') . ': ' . mb_substr($error, 0, 100)
+            : $this->CompleteAuth((string) ($_GET['code'] ?? ''));
         $ok = $message === '';
         $text = $ok ? $this->Translate('Signed in to Spotify. You can close this window.') : $message;
         if (!headers_sent()) {
@@ -236,7 +236,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
                 return;
             // Ab hier: Aufrufe der Kachel. RequestAction ist öffentlich, jede Eingabe wird geprüft.
             case 'Login':
-                // Anmeldeadresse erst beim Klick erzeugen; nur die anfragende Kachel (playerId) öffnet sie
+                // Anmeldung erst beim Klick starten (übernimmt die OAuth-Kennung); nur die anfragende Kachel (playerId) öffnet sie
                 $playerId = (string) $Value;
                 if (!preg_match('/^[a-f0-9]{24}$/', $playerId)) {
                     throw new InvalidArgumentException('Invalid player');

@@ -3,82 +3,55 @@
 declare(strict_types=1);
 
 /**
- * Anmeldung bei Spotify (OAuth 2.0 mit PKCE, ohne Client Secret), Token-Verwaltung und Geheimnisspeicher.
- * Der Rückruf kommt über den Hook /hook/spotifyplayer; die Redirect-URI muss in Spotifys
- * Developer-Dashboard genau so eingetragen sein (siehe Formular).
+ * Anmeldung bei Spotify über den OAuth-Dienst von Symcon (oauth.ipmagic.de, Kennung "spotify", dieselbe
+ * Spotify-App wie Symcons eigenes Spotify-Modul), Token-Verwaltung und Geheimnisspeicher.
+ * Der Dienst hält das Client Secret und legt die Berechtigungen fest; Spotify leitet über ihn an die
+ * Connect-Adresse zurück, Symcon ruft dann ProcessOAuthData der registrierten Instanz auf.
  */
 trait MusicPlayerSpotifyAuthTrait
 {
-    private const AUTH_URL = 'https://accounts.spotify.com/authorize';
-    private const TOKEN_URL = 'https://accounts.spotify.com/api/token';
-    private const HOOK = 'spotifyplayer';
+    private const OAUTH_ID = 'spotify';
+    private const OAUTH_URL = 'https://oauth.ipmagic.de/';
     private const CONNECT_GUID = '{9486D575-BE8C-4ED8-B5B5-20930E26DE6F}';
-    // Nur, was die Kachel braucht (Developer Terms V.3): keine E-Mail-Adresse
-    private const SCOPES = 'streaming user-read-private user-read-playback-state user-modify-playback-state '
-        . 'user-read-currently-playing user-library-read user-library-modify playlist-read-private playlist-read-collaborative '
-        . 'playlist-modify-public playlist-modify-private user-read-recently-played user-top-read user-follow-read user-follow-modify';
     private const AUTH_TTL = 600;
-    private const AUTH_MAX = 10;
 
-    /** Öffentliche Adresse des Rückrufs: eigene Basis oder die Connect-Adresse (https ist Pflicht bei Spotify). */
-    public function GetRedirectURI(): string
+    /** Connect-Adresse der Installation; ohne sie kommt der Rückruf von Spotify nicht an. */
+    private function ConnectURL(): string
     {
-        $base = trim($this->ReadPropertyString('RedirectBase'));
-        if ($base === '' && function_exists('CC_GetConnectURL') && function_exists('IPS_GetInstanceListByModuleID')) {
-            $connect = IPS_GetInstanceListByModuleID(self::CONNECT_GUID)[0] ?? 0;
-            $url = $connect > 0 ? CC_GetConnectURL($connect) : '';
-            $base = is_string($url) ? $url : '';
-        }
-        return $base === '' ? '' : rtrim($base, '/') . '/hook/' . self::HOOK;
-    }
-
-    /** Anmeldeadresse mit frischem PKCE-Paar; der Zustand merkt sich Instanz und Prüfwert für 10 Minuten. */
-    public function GetAuthURL(): string
-    {
-        $clientId = trim($this->ReadPropertyString('ClientID'));
-        $redirect = $this->GetRedirectURI();
-        if ($clientId === '' || $redirect === '') {
+        if (!function_exists('CC_GetConnectURL') || !function_exists('IPS_GetInstanceListByModuleID')) {
             return '';
         }
-        $verifier = rtrim(strtr(base64_encode(random_bytes(64)), '+/', '-_'), '=');
-        $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
-        $state = $this->InstanceID . '.' . bin2hex(random_bytes(16));
-        $pending = $this->PendingAuth();
-        $pending[$state] = ['verifier' => $verifier, 'time' => time()];
-        $this->SetBuffer('Auth', json_encode(array_slice($pending, -self::AUTH_MAX, null, true)));
-        return self::AUTH_URL . '?' . http_build_query([
-            'client_id'             => $clientId,
-            'response_type'         => 'code',
-            'redirect_uri'          => $redirect,
-            'scope'                 => self::SCOPES,
-            'code_challenge_method' => 'S256',
-            'code_challenge'        => $challenge,
-            'state'                 => $state,
-        ], '', '&', PHP_QUERY_RFC3986);
+        $connect = IPS_GetInstanceListByModuleID(self::CONNECT_GUID)[0] ?? 0;
+        $url = $connect > 0 ? CC_GetConnectURL($connect) : '';
+        return is_string($url) ? $url : '';
     }
 
-    /** Rückruf von Spotify: Code gegen Token tauschen. Liefert eine Meldung für die Rückrufseite. */
-    public function CompleteAuth(string $Code, string $State): string
+    /**
+     * Anmeldeadresse beim Symcon-Dienst. Erst hier übernimmt diese Instanz die Kennung "spotify"
+     * (der Rückruf geht an genau eine Instanz) und merkt sich die Anfrage für 10 Minuten.
+     */
+    public function GetAuthURL(): string
     {
-        $pending = $this->PendingAuth();
-        if (!preg_match('/^\d+\.[a-f0-9]{32}$/', $State) || !isset($pending[$State]) || !preg_match('/^[A-Za-z0-9._~-]{1,2048}$/', $Code)) {
-            // Ohne Code und Zustand selbst zu loggen: nur der Grund
-            $reason = !preg_match('/^\d+\.[a-f0-9]{32}$/', $State) ? 'state malformed' : (!isset($pending[$State]) ? 'state unknown or older than 10 min (' . count($pending) . ' pending)' : 'code malformed');
+        if ($this->ConnectURL() === '' || !$this->RegisterOAuth(self::OAUTH_ID)) {
+            return '';
+        }
+        $this->SetBuffer('Auth', (string) time());
+        return self::OAUTH_URL . 'authorize/' . self::OAUTH_ID . '?username=' . urlencode(IPS_GetLicensee());
+    }
+
+    /** Rückruf über Connect (?code=…): Code beim Symcon-Dienst gegen Token tauschen. Liefert eine Meldung für die Rückrufseite. */
+    public function CompleteAuth(string $Code): string
+    {
+        // Nur nach einer Anmeldung aus dieser Instanz; ohne Code selbst zu loggen
+        $requested = (int) $this->GetBuffer('Auth');
+        if ($requested === 0 || time() - $requested >= self::AUTH_TTL || !preg_match('/^[A-Za-z0-9._~-]{1,2048}$/', $Code)) {
+            $reason = $requested === 0 ? 'no sign-in started' : (time() - $requested >= self::AUTH_TTL ? 'sign-in older than 10 min' : 'code malformed');
             $this->LogMessage($this->Translate('Sign-in rejected: unknown or expired request') . ' (' . $reason . ')', KL_WARNING);
             return $this->Translate('Sign-in rejected: unknown or expired request');
         }
-        $verifier = $pending[$State]['verifier'];
-        unset($pending[$State]);
-        $this->SetBuffer('Auth', json_encode($pending));
+        $this->SetBuffer('Auth', '');
         try {
-            $data = $this->TokenRequest([
-                'grant_type'    => 'authorization_code',
-                'code'          => $Code,
-                'redirect_uri'  => $this->GetRedirectURI(),
-                'client_id'     => trim($this->ReadPropertyString('ClientID')),
-                'code_verifier' => $verifier,
-            ]);
-            $this->StoreTokens($data);
+            $this->StoreTokens($this->TokenRequest(['code' => $Code]));
             $me = $this->Api('GET', '/v1/me');
             $this->WriteAttributeString('UserID', (string) ($me['id'] ?? ''));
             $this->WriteAttributeString('UserName', mb_substr((string) ($me['display_name'] ?? ''), 0, 100));
@@ -101,11 +74,12 @@ trait MusicPlayerSpotifyAuthTrait
             return false;
         }
         try {
-            $data = $this->TokenRequest(['grant_type' => 'refresh_token', 'refresh_token' => $refresh, 'client_id' => trim($this->ReadPropertyString('ClientID'))]);
+            $data = $this->TokenRequest(['refresh_token' => $refresh]);
             $this->StoreTokens($data);
         } catch (\Throwable $e) {
             $this->LogMessage($this->Translate('Token refresh failed') . ': ' . $e->getMessage(), KL_WARNING);
-            // Spotify hat die Anmeldung widerrufen: neu anmelden statt endlos zu versuchen
+            // Spotify hat die Anmeldung widerrufen oder sie ist abgelaufen (Refresh-Token gelten 6 Monate):
+            // neu anmelden statt endlos zu versuchen
             if (str_contains($e->getMessage(), 'invalid_grant')) {
                 $this->ClearTokens();
                 $this->ClearState();
@@ -160,6 +134,7 @@ trait MusicPlayerSpotifyAuthTrait
         if (is_string($Data['refresh_token'] ?? null) && $Data['refresh_token'] !== '') {
             $this->WriteAttributeString('RefreshSecret', $this->Secrets()->Encrypt($Data['refresh_token'], $this->SecretContext('Refresh')));
         }
+        $this->WriteAttributeString('TokenSource', self::OAUTH_ID);
     }
 
     private function ClearTokens(): void
@@ -170,6 +145,7 @@ trait MusicPlayerSpotifyAuthTrait
         $this->WriteAttributeString('UserID', '');
         $this->WriteAttributeString('UserName', '');
         $this->WriteAttributeString('Product', '');
+        $this->WriteAttributeString('TokenSource', '');
     }
 
     private function ScheduleRefresh(): void
@@ -178,24 +154,16 @@ trait MusicPlayerSpotifyAuthTrait
         $this->SetTimerInterval('RefreshToken', $this->SignedIn() ? max(30, $seconds) * 1000 : 0);
     }
 
-    /** @return array<string, mixed> */
+    /** Code-Tausch und Erneuerung beim Symcon-Dienst (Antwort wie Spotifys Token-Endpunkt). @return array<string, mixed> */
     private function TokenRequest(array $Post): array
     {
-        $response = $this->Http('POST', self::TOKEN_URL, ['Content-Type: application/x-www-form-urlencoded'], http_build_query($Post, '', '&', PHP_QUERY_RFC3986));
+        $response = $this->Http('POST', self::OAUTH_URL . 'access_token/' . self::OAUTH_ID, ['Content-Type: application/x-www-form-urlencoded'], http_build_query($Post, '', '&', PHP_QUERY_RFC3986));
         $data = json_decode($response['body'], true);
         if ($response['status'] !== 200 || !is_array($data)) {
             $error = is_array($data) ? (string) ($data['error'] ?? '') . ' ' . (string) ($data['error_description'] ?? '') : '';
             throw new RuntimeException('HTTP ' . $response['status'] . ' ' . trim($error));
         }
         return $data;
-    }
-
-    /** @return array<string, array{verifier: string, time: int}> */
-    private function PendingAuth(): array
-    {
-        $pending = json_decode($this->GetBuffer('Auth'), true);
-        $pending = is_array($pending) ? $pending : [];
-        return array_filter($pending, static fn ($entry): bool => is_array($entry) && isset($entry['verifier'], $entry['time']) && time() - (int) $entry['time'] < self::AUTH_TTL);
     }
 
     private function Secret(string $Attribute, string $Field): string
@@ -215,7 +183,7 @@ trait MusicPlayerSpotifyAuthTrait
     }
 
     /**
-     * HTTP-Aufruf (Token-Endpunkt und Web API); in Tests überschreibbar.
+     * HTTP-Aufruf (Symcon-Dienst und Web API); in Tests überschreibbar.
      * @return array{status: int, body: string}
      */
     protected function Http(string $Method, string $Url, array $Headers, ?string $Body): array
@@ -241,7 +209,7 @@ trait MusicPlayerSpotifyAuthTrait
         $body = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         if (!is_string($body)) {
-            throw new RuntimeException('Spotify not reachable: ' . curl_error($ch));
+            throw new RuntimeException('Not reachable: ' . curl_error($ch));
         }
         return ['status' => $status, 'body' => strlen($body) > 1048576 ? '' : $body];
     }

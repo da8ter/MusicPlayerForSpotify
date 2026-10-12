@@ -2,19 +2,7 @@
     "elements": [
         {
             "type": "Label",
-            "caption": "Create an app at developer.spotify.com (Dashboard), enter the redirect URI shown below in the app settings and paste the Client ID here. Playback needs Spotify Premium."
-        },
-        {
-            "type": "ValidationTextBox",
-            "name": "ClientID",
-            "caption": "Client ID",
-            "width": "600px"
-        },
-        {
-            "type": "ValidationTextBox",
-            "name": "RedirectBase",
-            "caption": "Public base address (https), empty = Connect address",
-            "width": "600px"
+            "caption": "Sign in from the tile or with the link below; the sign-in runs through Symcon's OAuth service and needs an active Symcon Connect. Playback needs Spotify Premium."
         },
         {
             "type": "ValidationTextBox",
@@ -60,7 +48,7 @@
     "actions": [
         {
             "type": "Label",
-            "name": "RedirectInfo",
+            "name": "ConnectInfo",
             "caption": ""
         },
         {
@@ -71,7 +59,7 @@
         {
             "type": "Button",
             "caption": "Show sign-in link",
-            "onClick": "echo SPM_GetAuthURL($id) ?: 'Client ID or redirect URI missing';"
+            "onClick": "echo SPM_GetAuthURL($id) ?: 'Symcon Connect is not active';"
         },
         {
             "type": "Button",
@@ -93,7 +81,7 @@
         {
             "code": 201,
             "icon": "error",
-            "caption": "No Client ID"
+            "caption": "Symcon Connect is not active (needed to sign in)"
         },
         {
             "code": 202,

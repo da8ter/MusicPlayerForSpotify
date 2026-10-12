@@ -16,7 +16,7 @@ class IPSModuleStrict
 {
     public int $InstanceID;
     public array $properties = [], $attributes = [], $buffers = [], $messages = [], $timers = [];
-    public array $updates = [], $logs = [], $variables = [], $values = [], $actions = [], $hooks = [];
+    public array $updates = [], $logs = [], $variables = [], $values = [], $actions = [], $hooks = [], $oauth = [];
     public int $status = 0;
 
     public function __construct(int $InstanceID = 12345)
@@ -49,7 +49,9 @@ class IPSModuleStrict
     protected function SetTimerInterval(string $Ident, int $Milliseconds): bool { $this->read('timers', $Ident); $this->timers[$Ident] = $Milliseconds; return true; }
     protected function RegisterMessage(int $SenderID, int $Message): bool { $this->messages[$SenderID][] = $Message; return true; }
     protected function RegisterHook(string $Path): bool { $this->hooks[] = $Path; return true; }
-    protected function ProcessHookData(): void {}
+    protected function UnregisterHook(string $Path): bool { $this->hooks = array_values(array_diff($this->hooks, [$Path])); return true; }
+    protected function RegisterOAuth(string $ClientID): bool { $this->oauth[] = $ClientID; return true; }
+    protected function ProcessOAuthData(): void {}
     protected function SetStatus(int $Status): bool { $this->status = $Status; return true; }
     protected function SetVisualizationType(int $Type): bool { return true; }
     protected function ReloadForm(): void {}
@@ -115,6 +117,7 @@ function IPS_ApplyChanges(int $InstanceID): bool
 }
 function IPS_GetInstanceListByModuleID(string $ModuleID): array { return $GLOBALS['connect'] ?? []; }
 function CC_GetConnectURL(int $InstanceID): string|false { return 'https://example.ipmagic.de'; }
+function IPS_GetLicensee(): string { return 'nutzer+test@example.com'; }
 function IPS_InstanceExists(int $InstanceID): bool { return isset($GLOBALS['modules'][$InstanceID]); }
 function IPS_GetInstance(int $InstanceID): array { return ['ModuleInfo' => ['ModuleID' => '{E52C1561-E92E-4C39-9EDE-988A9285B8A1}']]; }
 function IPS_GetObjectIDByIdent(string $Ident, int $ParentID): int|false

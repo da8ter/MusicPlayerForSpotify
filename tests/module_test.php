@@ -16,9 +16,9 @@ final class TestModule extends MusicPlayerForSpotify
         return array_shift($this->responses) ?? ['status' => 200, 'body' => '{}'];
     }
 
-    public function hook(): void
+    public function oauth(): void
     {
-        $this->ProcessHookData();
+        $this->ProcessOAuthData();
     }
 }
 $json = static fn (array $data): array => ['status' => 200, 'body' => json_encode($data)];
@@ -49,61 +49,56 @@ $module = new TestModule(12345);
 $module->Create();
 $module->ApplyChanges();
 check(($module->messages[0] ?? []) === [IPS_KERNELSTARTED] && $module->variables === [], 'Module Strict: wartet vor KR_READY auf IPS_KERNELSTARTED');
-check(in_array('spotifyplayer', $module->hooks, true), 'Hook: /hook/spotifyplayer in Create registriert');
+check($module->hooks === [] && $module->oauth === [], 'Kein Hook; die OAuth-Kennung wird erst bei der Anmeldung übernommen');
 $runlevel = KR_READY;
 $module->MessageSink(0, 0, IPS_KERNELSTARTED, []);
-check(isset($module->variables['Playback']) && $module->status === 201, 'Module Strict: nach IPS_KERNELSTARTED Variablen angelegt; ohne Client-ID Status 201');
+check(isset($module->variables['Playback']) && $module->status === 201, 'Module Strict: nach IPS_KERNELSTARTED Variablen angelegt; ohne Connect Status 201');
+check($module->GetAuthURL() === '' && $module->oauth === [], 'Ohne Connect keine Anmeldung');
 check(!preg_match('/IPS_ApplyChanges\s*\(\s*\$this->InstanceID/', (string) file_get_contents(__DIR__ . '/../SpotifyPlayer/module.php')), 'Kein re-entrantes IPS_ApplyChanges im Modul');
 
-// ── Anmeldung (PKCE) ──
+// ── Anmeldung (Symcon-OAuth-Dienst) ──
 $connect = [40000]; // Connect-Control-Instanz der Attrappe
-IPS_SetProperty(12345, 'ClientID', 'client123');
 IPS_SetProperty(12345, 'Favorites', json_encode([['Name' => 'Mix', 'URL' => 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M'], ['Name' => 'kaputt', 'URL' => 'x'], ['Name' => '', 'URL' => 'spotify:track:4uLU6hMCjMI75M1A2tKUQC']]));
 IPS_ApplyChanges(12345);
-check($module->status === 202 && count($module->updates) === 2 && end($module->updates) === ['type' => 'reload'], 'Status 202 ohne Anmeldung; geänderte Client-ID lädt die Kacheln neu');
-check($module->GetRedirectURI() === 'https://example.ipmagic.de/hook/spotifyplayer', 'Redirect-URI aus der Connect-Adresse');
+check($module->status === 202 && count($module->updates) === 2 && end($module->updates) === ['type' => 'reload'], 'Status 202 ohne Anmeldung; Connect verfügbar lädt die Kacheln neu');
+check($module->CompleteAuth('code') !== '' && $module->http === [], 'Rückruf ohne gestartete Anmeldung wird ohne Netzaufruf abgelehnt');
 $url = $module->GetAuthURL();
-parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
-$pending = json_decode($module->buffers['Auth'], true);
-$verifier = $pending[$q['state']]['verifier'];
-check(str_starts_with($url, 'https://accounts.spotify.com/authorize?') && $q['client_id'] === 'client123' && $q['code_challenge_method'] === 'S256'
-    && $q['redirect_uri'] === 'https://example.ipmagic.de/hook/spotifyplayer' && str_contains($q['scope'], 'streaming') && !str_contains($q['scope'], 'email'), 'Anmeldeadresse: Client-ID, Redirect-URI, Scopes ohne E-Mail');
-check(preg_match('/^12345\.[a-f0-9]{32}$/', $q['state']) === 1 && $q['code_challenge'] === rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '='), 'PKCE: Zustand trägt die Instanz, Challenge = SHA-256 des Prüfwerts');
-check($module->CompleteAuth('code', '12345.' . str_repeat('a', 32)) !== '' && $module->http === [], 'Rückruf: unbekannter Zustand wird ohne Netzaufruf abgelehnt');
-$module->responses = [$json(['access_token' => 'ACCESS1xxxxxxxxxxxxxxxxxxxx', 'refresh_token' => 'REFRESH1xxxxxxxxxxxxxxxxxxx', 'expires_in' => 3600]), $json(['id' => 'stephan', 'display_name' => 'Stephan', 'product' => 'premium'])];
-check($module->CompleteAuth('thecode', $q['state']) === '', 'Rückruf: Code gegen Token getauscht');
+check($url === 'https://oauth.ipmagic.de/authorize/spotify?username=nutzer%2Btest%40example.com' && $module->oauth === ['spotify'], 'Anmeldeadresse beim Symcon-Dienst mit Lizenznehmer; OAuth-Kennung übernommen');
+check($module->CompleteAuth('bad code<') !== '' && $module->http === [], 'Rückruf: ungültiger Code ohne Netzaufruf abgelehnt');
+$module->responses = [$json(['token_type' => 'Bearer', 'access_token' => 'ACCESS1xxxxxxxxxxxxxxxxxxxx', 'refresh_token' => 'REFRESH1xxxxxxxxxxxxxxxxxxx', 'expires_in' => 3600]), $json(['id' => 'stephan', 'display_name' => 'Stephan', 'product' => 'premium'])];
+check($module->CompleteAuth('thecode') === '', 'Rückruf: Code gegen Token getauscht');
 parse_str((string) $module->http[0]['body'], $post);
-check($module->http[0]['method'] === 'POST' && str_starts_with($module->http[0]['url'], 'https://accounts.spotify.com/api/token') && $post['code'] === 'thecode' && $post['code_verifier'] === $verifier && !isset($post['client_secret']), 'Token-Tausch mit Prüfwert, ohne Client Secret');
+check($module->http[0]['method'] === 'POST' && $module->http[0]['url'] === 'https://oauth.ipmagic.de/access_token/spotify' && $post === ['code' => 'thecode'], 'Token-Tausch beim Symcon-Dienst, nur mit dem Code');
 check($module->http[1]['url'] === 'https://api.spotify.com/v1/me' && in_array('Authorization: Bearer ACCESS1xxxxxxxxxxxxxxxxxxxx', $module->http[1]['headers'], true), 'Nach der Anmeldung Profil geholt');
-check($module->status === IS_ACTIVE && $module->attributes['UserID'] === 'stephan' && $module->attributes['Product'] === 'premium', 'Angemeldet: Status aktiv, Profil gespeichert');
+check($module->status === IS_ACTIVE && $module->attributes['UserID'] === 'stephan' && $module->attributes['Product'] === 'premium' && $module->attributes['TokenSource'] === 'spotify', 'Angemeldet: Status aktiv, Profil und Herkunft gespeichert');
 check(!str_contains(json_encode($module->attributes), 'REFRESH1xxxxxxxxxxxxxxxxxxx') && !str_contains(json_encode($module->attributes), 'ACCESS1xxxxxxxxxxxxxxxxxxxx'), 'Token liegen nur verschlüsselt in Attributen');
 check(end($module->updates) === ['type' => 'auth', 'signedIn' => true], 'Anmeldung: Kacheln bekommen das Signal auth');
-check($module->CompleteAuth('thecode', $q['state']) !== '', 'Rückruf: derselbe Zustand gilt nur einmal');
+check($module->CompleteAuth('thecode') !== '', 'Rückruf: eine gestartete Anmeldung gilt nur einmal');
 check($module->timers['RefreshToken'] > 0 && $module->timers['Poll'] === 10000, 'Timer: Token-Erneuerung und Abfrage laufen');
 
-// ── Hook ──
+// ── Rückrufseite ──
 $_GET = ['error' => 'access_denied'];
 ob_start();
-$module->hook();
+$module->oauth();
 $out = ob_get_clean();
-check(str_contains($out, 'access_denied') && !str_contains($out, 'window.close'), 'Hook: Fehler von Spotify wird angezeigt');
-$_GET = ['code' => 'x', 'state' => '12345.' . str_repeat('b', 32)];
+check(str_contains($out, 'access_denied') && !str_contains($out, 'window.close'), 'Rückrufseite: Fehler von Spotify wird angezeigt');
+$_GET = ['code' => 'x'];
 ob_start();
-$module->hook();
+$module->oauth();
 $out = ob_get_clean();
-check(str_contains($out, 'unknown or expired'), 'Hook: unbekannter Zustand abgelehnt');
-$_GET = ['code' => 'x<script>', 'state' => '<b>'];
+check(str_contains($out, 'unknown or expired'), 'Rückrufseite: Code ohne gestartete Anmeldung abgelehnt');
+$_GET = ['error' => '<script>x'];
 ob_start();
-$module->hook();
+$module->oauth();
 $out = ob_get_clean();
-check(!str_contains($out, '<script>') && !str_contains($out, '<b>'), 'Hook: Eingaben landen nicht roh in der Seite');
+check(!str_contains($out, '<script>x'), 'Rückrufseite: Eingaben landen nicht roh in der Seite');
 
 // ── Token-Erneuerung ──
 $module->http = [];
 $module->responses = [$json(['access_token' => 'ACCESS2xxxxxxxxxxxxxxxxxxxx', 'expires_in' => 3600])];
 check($module->RefreshAccessToken() && end($module->updates)['type'] === 'token' && end($module->updates)['accessToken'] === 'ACCESS2xxxxxxxxxxxxxxxxxxxx', 'Erneuerung: neues Token geht per Push an die Kacheln');
 parse_str((string) $module->http[0]['body'], $post);
-check($post['grant_type'] === 'refresh_token' && $post['refresh_token'] === 'REFRESH1xxxxxxxxxxxxxxxxxxx', 'Erneuerung mit dem gespeicherten Refresh-Token');
+check($post === ['refresh_token' => 'REFRESH1xxxxxxxxxxxxxxxxxxx'] && $module->http[0]['url'] === 'https://oauth.ipmagic.de/access_token/spotify', 'Erneuerung beim Symcon-Dienst mit dem gespeicherten Refresh-Token');
 $module->http = [];
 $module->responses = [['status' => 401, 'body' => '{"error":{"status":401}}'], $json(['access_token' => 'ACCESS3xxxxxxxxxxxxxxxxxxxx', 'expires_in' => 3600]), $json(['devices' => [['id' => 'dev1', 'name' => 'Küche', 'is_active' => true]]]), ['status' => 204, 'body' => '']];
 check($module->Play() && count($module->http) === 4 && $module->http[3]['method'] === 'PUT' && str_contains($module->http[3]['url'], '/v1/me/player/play?device_id=dev1'), 'Web API: bei 401 Token erneuern und wiederholen; Befehl geht an das aktive Gerät');
@@ -170,7 +165,15 @@ check(end($module->updates) === ['type' => 'reload'], 'Übernehmen nach Abmeldun
 $config = json_decode((static function (string $html): string { preg_match('#window\.SPM_CONFIG = (.*?);</script>#s', $html, $m); return $m[1]; })($module->GetVisualizationTile()), true);
 check($config['mode'] === 'login' && $config['accessToken'] === '' && !isset($config['authUrl']), 'Kachel ohne Anmeldung: kein Token, keine Anmeldeadresse im Seitenaufbau');
 $module->RequestAction('Login', str_repeat('ab', 12));
-check(end($module->updates)['type'] === 'login' && end($module->updates)['playerId'] === str_repeat('ab', 12) && str_starts_with(end($module->updates)['url'], 'https://accounts.spotify.com/authorize?'), 'Anmeldung aus der Kachel: Adresse per Push nur für die anfragende Kachel');
+check(end($module->updates)['type'] === 'login' && end($module->updates)['playerId'] === str_repeat('ab', 12) && str_starts_with(end($module->updates)['url'], 'https://oauth.ipmagic.de/authorize/spotify?'), 'Anmeldung aus der Kachel: Adresse per Push nur für die anfragende Kachel');
+
+// ── Umstieg von der eigenen Spotify-App ──
+$old = new TestModule(23456);
+$old->Create();
+$old->hooks = ['spotifyplayer'];
+$old->attributes['RefreshSecret'] = 'alt';
+$old->ApplyChanges();
+check($old->attributes['RefreshSecret'] === '' && $old->status === 202 && $old->hooks === [], 'Umstieg: Token der eigenen App verworfen, alter Hook abgemeldet');
 check(throws(fn () => $module->RequestAction('Login', 'x'), InvalidArgumentException::class), 'Anmeldung aus der Kachel: ungültige Kennung abgelehnt');
 
 echo PHP_EOL . 'All tests passed' . PHP_EOL;

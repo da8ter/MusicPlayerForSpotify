@@ -370,9 +370,16 @@
       return;
     }
     if (msg.type === 'token' && typeof msg.accessToken === 'string') { setToken(msg.accessToken, Number(msg.expiresAt) || 0); return; }
-    if (msg.type === 'login' && msg.playerId === slot().playerId && typeof msg.url === 'string' && msg.url.indexOf('https://accounts.spotify.com/') === 0) {
-      if (loginWindow && !loginWindow.closed) loginWindow.location.href = msg.url;
-      else window.open(msg.url, '_blank', 'popup,width=520,height=760');
+    if (msg.type === 'login' && msg.playerId === slot().playerId && typeof msg.url === 'string') {
+      if (msg.url.indexOf('https://oauth.ipmagic.de/authorize/') === 0) {
+        if (loginWindow && !loginWindow.closed) loginWindow.location.href = msg.url;
+        else window.open(msg.url, '_blank', 'popup,width=520,height=760');
+      } else {
+        // Ohne Connect startet keine Anmeldung
+        if (loginWindow && !loginWindow.closed) loginWindow.close();
+        loginWindow = null;
+        emit('error', T('Signing in needs an active Symcon Connect'));
+      }
       return;
     }
     if (msg.type === 'favorites' && Array.isArray(msg.favorites)) { cfg.favorites = msg.favorites; emit('favorites'); }
@@ -383,8 +390,8 @@
     receive(ev.data);
   });
 
-  // Anmeldung: das Fenster sofort im Klick öffnen (sonst blockt der Browser es), die Adresse mit
-  // frischem PKCE-Paar kommt vom Modul per Push (type login) für genau diese Kachel.
+  // Anmeldung: das Fenster sofort im Klick öffnen (sonst blockt der Browser es), die Adresse des
+  // Symcon-OAuth-Dienstes kommt vom Modul per Push (type login) für genau diese Kachel.
   let loginWindow = null;
   function login() {
     loginWindow = window.open('', '_blank', 'popup,width=520,height=760');

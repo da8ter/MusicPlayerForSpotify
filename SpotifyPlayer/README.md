@@ -4,9 +4,8 @@ Spielt Spotify direkt in der Symcon-Kachelvisualisierung und steuert jedes Spoti
 
 ## Voraussetzungen
 
-- Symcon ab 8.1 mit Kachelvisualisierung und einer **Connect-Adresse** (https), denn Spotify erlaubt den Rückruf der Anmeldung nur über https. Alternativ eine eigene öffentliche https-Adresse.
+- Symcon ab 8.1 mit Kachelvisualisierung und aktivem **Symcon Connect**. Die Anmeldung läuft über den OAuth-Dienst von Symcon (`oauth.ipmagic.de`) mit derselben Spotify-App wie Symcons eigenes Spotify-Modul; Spotify leitet danach über die Connect-Adresse zurück. Eine eigene App bei Spotify ist nicht nötig.
 - **Spotify Premium**: Ohne Premium lässt Spotify weder die Wiedergabe in der Kachel noch die Steuerung von Geräten zu. Mediathek und Suche gehen auch ohne.
-- Eine **eigene App bei Spotify** (kostenlos): Unter https://developer.spotify.com/dashboard anmelden, *Create app*, einen Namen vergeben, als Redirect URI die Adresse aus dem Instanzformular eintragen (`https://<Connect-Adresse>/hook/spotifyplayer`), bei den APIs *Web API* und *Web Playback SDK* anhaken. Die **Client ID** aus den App-Einstellungen kommt in die Instanz. Spotify lässt solche Apps im Development Mode mit **bis zu 5 Nutzern** laufen; weitere Konten müssen in der App unter *User Management* eingetragen werden. Der Inhaber der App braucht selbst Spotify Premium, und je Entwicklerkonto sind 25 Apps erlaubt.
 
 ## Wo die Musik spielt
 
@@ -17,11 +16,12 @@ Spielt Spotify direkt in der Symcon-Kachelvisualisierung und steuert jedes Spoti
 ## Einrichtung
 
 1. Instanz „Musikplayer für Spotify“ anlegen.
-2. **Client ID** eintragen und übernehmen. Das Formular zeigt die Redirect-URI, die in der Spotify-App stehen muss.
-3. Die Kachel öffnen und **Mit Spotify anmelden** (öffnet ein Fenster bei Spotify; Pop-ups erlauben). Die Anmeldung gilt danach für alle Geräte der Instanz.
-4. Optional Favoriten anlegen: Name und ein `open.spotify.com`-Link (oder `spotify:`-URI) zu einer Playlist, einem Album, einem Titel oder einem Künstler (in Spotify über *Teilen → Link kopieren*).
+2. Die Kachel öffnen und **Mit Spotify anmelden** (öffnet ein Fenster bei Spotify; Pop-ups erlauben). Alternativ im Instanzformular *Anmeldelink anzeigen* und den Link im Browser öffnen. Die Anmeldung gilt danach für alle Geräte der Instanz.
+3. Optional Favoriten anlegen: Name und ein `open.spotify.com`-Link (oder `spotify:`-URI) zu einer Playlist, einem Album, einem Titel oder einem Künstler (in Spotify über *Teilen → Link kopieren*).
 
-Das Modul erneuert das Access-Token selbst (Spotify-Token gelten eine Stunde). Die Anmeldung endet nur über **Abmelden** oder wenn Spotify sie widerruft.
+Das Modul erneuert das Access-Token selbst (Spotify-Token gelten eine Stunde). Die Anmeldung endet über **Abmelden**, wenn Spotify sie widerruft, oder nach spätestens sechs Monaten (so lange gelten Spotifys Refresh-Token seit Juli 2026); dann zeigt die Kachel wieder **Mit Spotify anmelden**.
+
+Wer vorher eine eigene Spotify-App mit Client ID genutzt hat: Nach dem Update ist die Instanz abgemeldet, einmal neu anmelden genügt. Die App bei Spotify kann danach gelöscht werden.
 
 ## Variablen
 
@@ -62,16 +62,18 @@ Alle Funktionen geben `false` zurück und schreiben ins Log, wenn kein Gerät er
 
 - Spotify stellt neue Titel nur hinten an die Warteschlange; „Als Nächstes“ gibt es in der Web API nicht. Die Warteschlange lässt sich anzeigen, aber nicht umsortieren.
 - Seit Spotifys Umstellung für Apps im Development Mode (Februar 2026, bestehende Apps ab 9. März 2026) gibt es für solche Apps keine Neuerscheinungen, Browse-Kategorien, Empfehlungen, ähnlichen Künstler und Top-Titel eines Künstlers mehr; Playlist-Inhalte liefert Spotify nur für eigene und gemeinsame Playlists. „Start“ und „Neu“ bauen deshalb auf deiner Mediathek und deinen Künstlern auf, die Künstlerseite holt Titel über die Suche, und bei fremden Playlists steht ein Hinweis. Suche und Künstleralben liefert Spotify nur in Zehnerschritten, das Modul blättert selbst nach.
+- **Zusammen mit Symcons Spotify-Modul:** Beide nutzen beim OAuth-Dienst dieselbe Kennung, und der Rückruf der Anmeldung geht an genau eine Instanz. Dieses Modul übernimmt sie beim Klick auf *Anmelden*, Symcons Modul beim Übernehmen seiner Instanz. Vor einer Anmeldung in Symcons Modul daher dort einmal *Übernehmen*. Bestehende Anmeldungen beider Module betrifft das nicht. Dasselbe gilt für mehrere Instanzen dieses Moduls: angemeldet wird jeweils die Instanz, deren Kachel die Anmeldung gestartet hat.
 - Das Access-Token ist in der Kachel sichtbar. Wer die Visualisierung öffnen darf, kann damit das Spotify-Konto bedienen, so wie über die Kachel selbst.
 
 ## Nutzungsbedingungen und Datenschutz
 
-Das Modul nutzt die Spotify-Plattform über eine App, die du selbst bei Spotify anlegst. Damit gelten für dich die [Spotify Developer Terms](https://developer.spotify.com/terms) und die Spotify-Nutzungsbedingungen. Daraus folgt für die Nutzung dieses Moduls:
+Das Modul nutzt die Spotify-Plattform über die Spotify-App von Symcon, die auch Symcons eigenes Spotify-Modul verwendet. Für die Nutzung gelten die Spotify-Nutzungsbedingungen; für das Modul selbst die [Spotify Developer Terms](https://developer.spotify.com/terms). Daraus folgt:
 
 - Das Modul ist ein unabhängiges Projekt. Es gibt keine Gewährleistung oder Zusicherung im Namen von Spotify; alle stillschweigenden Gewährleistungen für die Spotify-Plattform, den Spotify-Dienst und Spotify-Inhalte (Marktgängigkeit, Eignung für einen bestimmten Zweck, Nichtverletzung von Rechten) sind ausgeschlossen. Verantwortlich für das Modul ist sein Autor, nicht Spotify; Spotify haftet nicht für das Modul.
 - Die Spotify-Plattform, der Spotify-Dienst und Spotify-Inhalte dürfen nicht verändert, abgeleitet, dekompiliert oder zurückentwickelt werden, soweit das Gesetz nichts anderes erlaubt.
 - Spotify ist Drittbegünstigter dieser Bedingungen und kann sie unmittelbar durchsetzen.
-- **Welche Daten das Modul verarbeitet:** die Anmeldung bei Spotify (Refresh- und Access-Token, verschlüsselt in der Instanz), Benutzer-ID und Anzeigename deines Spotify-Kontos, und den Wiedergabezustand (Titel, Interpret, Album, Cover-Adresse, Gerät, Lautstärke) in den Variablen. Die Kachel hält Listen aus Spotify höchstens fünf Minuten im Browser vor. Alle Daten bleiben in deinem Symcon und gehen ausschließlich an Spotify; das Modul gibt nichts an Dritte weiter, setzt keine Cookies und verkauft keine Daten.
+- **Welche Daten das Modul verarbeitet:** die Anmeldung bei Spotify (Refresh- und Access-Token, verschlüsselt in der Instanz), Benutzer-ID und Anzeigename deines Spotify-Kontos, und den Wiedergabezustand (Titel, Interpret, Album, Cover-Adresse, Gerät, Lautstärke) in den Variablen. Die Kachel hält Listen aus Spotify höchstens fünf Minuten im Browser vor. Spotify fragt bei der Anmeldung auch den Zugriff auf die E-Mail-Adresse ab, weil Symcons App diese Berechtigung anfordert; das Modul liest sie nicht.
+- **Wohin Daten gehen:** Anmeldung und Token-Erneuerung laufen über den OAuth-Dienst von Symcon (`oauth.ipmagic.de`), der dafür deinen Symcon-Lizenznehmer, den Anmeldecode und das Refresh-Token an Spotify weiterreicht. Alles andere geht direkt an Spotify. Das Modul gibt nichts an weitere Dritte weiter, setzt keine Cookies und verkauft keine Daten.
 - **Verbindung trennen:** „Von Spotify abmelden“ (Kachel oder Instanz) löscht Token, Kontodaten und den Wiedergabezustand; die Instanz zu löschen entfernt alles. Danach fragt das Modul keine Daten mehr ab. Zusätzlich kannst du den Zugriff unter spotify.com in den Kontoeinstellungen (*Apps*) widerrufen.
 - Die Wiedergabe setzt Spotify Premium voraus; das Modul darf nicht gegen Bezahlung angeboten werden, denn eine kommerzielle Nutzung der Spotify-Plattform erfordert die schriftliche Zustimmung von Spotify.
 
