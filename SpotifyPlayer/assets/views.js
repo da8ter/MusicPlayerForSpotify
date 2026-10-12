@@ -1,7 +1,7 @@
 /* Musikplayer für Spotify – Inhalte der Bereiche: Start (zuletzt gehört, Top-Künstler, Top-Titel,
-   eigene Playlists, gespeicherte Alben, gefolgte Künstler), Neu (neue Alben der eigenen Künstler,
-   zuletzt gespeichert; Spotifys Neuerscheinungen nur, wo die App sie noch bekommt) und die
-   Mediathek mit ihren Kategorien. Bausteine kommen aus ui.js (window.AMPUI). */
+   eigene Playlists, gespeicherte Alben, gefolgte Künstler), Neu (Spotifys Neuerscheinungen, neue
+   Alben der eigenen Künstler, zuletzt gespeichert) und die Mediathek mit ihren Kategorien.
+   Bausteine kommen aus ui.js (window.AMPUI). */
 (function () {
   'use strict';
   const AMP = window.AMP;
@@ -42,14 +42,13 @@
     });
   }
 
-  // ── Neu: neue Alben der Künstler, denen du folgst oder die du oft hörst; zuletzt gespeichert ──
-  // Spotifys Neuerscheinungen (browse/new-releases) bekommen neue Apps nicht mehr (HTTP 403); wo doch, stehen sie oben.
+  // ── Neu: Spotifys Neuerscheinungen, neue Alben der Künstler, denen du folgst oder die du oft hörst; zuletzt gespeichert ──
   function fresh() {
     ui.page(T('New'));
     if (ui.notSignedIn()) return;
     ui.load(async current => {
       const [releases, following, top, saved] = await Promise.all([
-        AMP.api('/v1/browse/new-releases', { limit: 20 }).catch(() => ({ albums: { items: [] } })),
+        AMP.api('/v1/browse/new-releases', { limit: 30 }).catch(() => ({ albums: { items: [] } })),
         AMP.api('/v1/me/following', { type: 'artist', limit: 20 }).catch(none),
         AMP.api('/v1/me/top/artists', { limit: 10, time_range: 'medium_term' }).catch(none),
         AMP.api('/v1/me/albums', { limit: 20 }).catch(none),

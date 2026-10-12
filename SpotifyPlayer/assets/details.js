@@ -92,7 +92,7 @@
     panel.appendChild(list);
     (async () => {
       const base = '/v1/artists/' + encodeURIComponent(id);
-      // Top-Titel bekommen neue Apps nicht mehr (HTTP 403): dann die Suche nach Titeln des Künstlers
+      // Top-Titel des Künstlers; gibt Spotify sie nicht heraus (Apps im Development Mode: HTTP 403), die Suche nach seinen Titeln
       const topTracks = async () => {
         try { return (await AMP.api(base + '/top-tracks', { market: 'from_token' })).tracks || []; } catch (e) { /* Rückfall */ }
         const name = resource.name || (await AMP.api(base).catch(() => ({}))).name || '';
@@ -102,8 +102,7 @@
       };
       const [top, albums] = await Promise.all([
         topTracks(),
-        // Spotify erlaubt neuen Apps hier höchstens limit 10: seitenweise bis 50
-        AMP.apiAll(base + '/albums', { include_groups: 'album,single', limit: 10, market: 'from_token' }, 50).catch(() => []),
+        AMP.apiAll(base + '/albums', { include_groups: 'album,single', limit: 50, market: 'from_token' }, 50).catch(() => []),
       ]);
       list.innerHTML = '';
       const tracks = top.slice(0, 10);
@@ -147,7 +146,7 @@
     list.innerHTML = '<p class="empty">' + esc(T('Loading…')) + '</p>';
     panel.appendChild(list);
     (async () => {
-      // Playlist-Inhalte (/items, seit Februar 2026) gibt Spotify nur für eigene und gemeinsame Playlists frei
+      // Playlist-Inhalte über /items (seit Februar 2026, Einträge unter item)
       const path = kind === 'album' ? '/v1/albums/' + encodeURIComponent(id) + '/tracks' : '/v1/playlists/' + encodeURIComponent(id) + '/items';
       const params = kind === 'album' ? { limit: 50, market: 'from_token' } : { limit: 50, market: 'from_token', additional_types: 'track', fields: 'next,items(item(id,uri,name,type,duration_ms,track_number,artists(name)))' };
       const items = await AMP.apiAll(path, params, 1000);
@@ -173,7 +172,7 @@
       markPlaying();
     })().catch(e => {
       AMP.debug('collection: ' + (e && (e.stack || e.message) || e));
-      // Fremde und redaktionelle Playlists gibt Spotify neuen Apps nicht frei (HTTP 403)
+      // Manche Playlists gibt Spotify nicht heraus (HTTP 403)
       list.innerHTML = '<p class="empty">' + esc(T(e && e.status === 403 ? 'Spotify does not share this content with this app' : 'No results')) + '</p>';
     });
   }
