@@ -13,6 +13,73 @@
   let seeking = false;
   let queueShown = false;
 
+  // ── Name der Kachel als Spotify-Connect-Gerät: selbst vergeben (je Browser bzw. App gespeichert)
+  // oder Instanzname plus Gerätetyp („Symcon · iPhone“); den echten Gerätenamen geben Browser nicht heraus ──
+  const NAME_KEY = 'symconSpotifyDeviceName';
+  const storedName = () => { try { return String(localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { return ''; } };
+  function platform() {
+    const ua = navigator.userAgent || '';
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+    if (/iPhone|iPod/.test(ua)) return 'iPhone';
+    if (/Android/.test(ua)) return 'Android';
+    if (/CrOS/.test(ua)) return 'ChromeOS';
+    if (/Windows/.test(ua)) return 'Windows';
+    if (/Macintosh/.test(ua)) return 'Mac';
+    if (/Linux/.test(ua)) return 'Linux';
+    return '';
+  }
+  async function autoName() {
+    let kind = platform();
+    // Android: Chrome und Edge nennen auf Nachfrage das Modell („Pixel 8“)
+    if (kind === 'Android' && navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+      try { kind = (await navigator.userAgentData.getHighEntropyValues(['model'])).model || kind; } catch (e) { /* Typ genügt */ }
+    }
+    const base = AMP.cfg.playerName || 'Symcon';
+    return kind ? base + ' · ' + kind : base;
+  }
+  async function deviceName() { return (storedName() || await autoName()).slice(0, 64); }
+
+  // Spotify übernimmt den Namen nur beim Verbinden des Players, also beim nächsten Laden der Visualisierung
+  async function renameDevice() {
+    const sheet = $('sheet');
+    sheet.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'sheet-box';
+    box.innerHTML = '<div class="sheet-title">' + esc(T('Name this device')) + '</div>';
+    const form = document.createElement('div');
+    form.className = 'sheet-new';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 64;
+    input.value = storedName();
+    input.placeholder = await autoName();
+    form.appendChild(input);
+    const save = document.createElement('button');
+    save.className = 'primary';
+    save.textContent = T('Save');
+    save.onclick = () => {
+      try {
+        if (input.value.trim()) localStorage.setItem(NAME_KEY, input.value.trim());
+        else localStorage.removeItem(NAME_KEY);
+        notice(T('The new name applies after reloading the visualization'));
+      } catch (e) { notice(T('Could not save')); }
+      sheet.hidden = true;
+    };
+    form.appendChild(save);
+    box.appendChild(form);
+    box.insertAdjacentHTML('beforeend', '<p class="empty">' + esc(T('Leave empty for the automatic name')) + '</p>');
+    const cancel = document.createElement('button');
+    cancel.className = 'sheet-item sheet-cancel';
+    cancel.textContent = T('Cancel');
+    cancel.onclick = () => { sheet.hidden = true; };
+    box.appendChild(cancel);
+    sheet.appendChild(box);
+    if (window.AMPScroll) window.AMPScroll.bind(box);
+    sheet.onclick = e => { if (e.target === sheet) sheet.hidden = true; };
+    sheet.hidden = false;
+    input.focus();
+  }
+
   // ── Öffnen und Schließen ──
   function openPlayer() {
     $('np').classList.add('open');
@@ -88,6 +155,9 @@
     $('deviceIcon').innerHTML = svg('stream');
     $('deviceName').textContent = s.deviceId && !s.local ? s.deviceName : '';
     $('bDevices').classList.toggle('on', !!s.deviceId && !s.local);
+    // Seitenleiste: wo es gerade spielt (eigene Kachel als „Diese Kachel“)
+    $('sideDevicesLabel').textContent = s.deviceId && !s.local ? s.deviceName : s.local ? T('This tile') : T('Devices');
+    $('sideDevices').classList.toggle('on', !!s.deviceId && !s.local);
     updateLove(item && item.type === 'track' ? item.id : '');
     renderTime();
   }
@@ -160,7 +230,7 @@
       const b = document.createElement('button');
       const active = d.is_active || d.id === current.deviceId;
       b.className = 'sheet-item device' + (active ? ' active' : '');
-      b.innerHTML = svg(DEVICE_ICONS[d.type] || 'speaker') + '<span>' + esc(d.id === sdk ? T('This tile') : d.name) + '</span>' + (active ? svg('check', 'check') : '');
+      b.innerHTML = svg(DEVICE_ICONS[d.type] || 'speaker') + '<span>' + esc(d.id === sdk ? T('This tile') : d.name) + (d.id === sdk && d.name && d.name !== T('This tile') ? '<small>' + esc(d.name) + '</small>' : '') + '</span>' + (active ? svg('check', 'check') : '');
       b.onclick = async () => {
         sheet.hidden = true;
         if (active) return;
@@ -170,6 +240,13 @@
       box.appendChild(b);
     });
     if (!list.length) box.insertAdjacentHTML('beforeend', '<p class="empty">' + esc(T('No device available: open the tile in a browser or start Spotify on a device')) + '</p>');
+    if (AMP.hasPlayer()) {
+      const rename = document.createElement('button');
+      rename.className = 'sheet-item';
+      rename.textContent = T('Name this device') + ' …';
+      rename.onclick = renameDevice;
+      box.appendChild(rename);
+    }
     const cancel = document.createElement('button');
     cancel.className = 'sheet-item sheet-cancel';
     cancel.textContent = T('Cancel');
@@ -221,6 +298,9 @@
     $('npClose').onclick = closePlayer;
     $('bQueue').onclick = () => showQueue(!queueShown);
     $('bDevices').onclick = pickDevice;
+    $('sideDevices').insertAdjacentHTML('afterbegin', svg('stream', 'side-icon'));
+    $('sideDevices').title = T('Devices');
+    $('sideDevices').onclick = pickDevice;
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('np').classList.contains('open') && $('sheet').hidden) closePlayer(); });
     // Titel und Interpret öffnen das Album des laufenden Titels
     ['title', 'subtitle'].forEach(id => { $(id).onclick = () => { closePlayer(); window.AMPDetails.openNowPlayingAlbum(); }; });
@@ -250,5 +330,5 @@
   setInterval(renderTime, 1000);
 
   bind();
-  window.AMPPlayer = { open: openPlayer, close: closePlayer };
+  window.AMPPlayer = { open: openPlayer, close: closePlayer, deviceName };
 })();

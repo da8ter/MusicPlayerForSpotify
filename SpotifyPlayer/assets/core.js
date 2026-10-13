@@ -213,7 +213,7 @@
         s.state = 'configuring';
         try {
           const options = new win.Object();
-          options.name = cfg.playerName || 'Symcon';
+          options.name = window.AMPPlayer ? await window.AMPPlayer.deviceName() : (cfg.playerName || 'Symcon');
           options.volume = 0.5;
           // Token-Rückruf und Geräte-ID gehören dem Player-Fenster: das SDK hält keine Kachel fest
           options.getOAuthToken = new win.Function('cb', 'cb(window["' + SLOT + '"].token);');

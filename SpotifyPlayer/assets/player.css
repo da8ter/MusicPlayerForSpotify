@@ -269,6 +269,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .sheet-item.device { display: flex; align-items: center; gap: 12px; }
 .sheet-item.device svg { width: 20px; height: 20px; }
 .sheet-item.device span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-item.device small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 400; color: var(--muted); }
 .sheet-item.device.active { color: var(--accent); }
 .sheet-item.device .check { width: 15px; height: 15px; }
 .sheet-list { display: flex; flex-direction: column; gap: 6px; }

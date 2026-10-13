@@ -44,6 +44,8 @@ html.wide .sidebar {
 .side-item.active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; }
 .side-icon { width: 18px; height: 18px; color: var(--accent); }
 .side-foot { flex: none; padding: 6px 10px 12px; }
+.side-devices { width: calc(100% + 20px); margin: 0 -10px 6px; color: var(--muted); }
+.side-devices.on { color: var(--accent); }
 /* Markenhinweis: Spotify-Logo in Spotify-Grün neben Inhalten aus Spotify */
 .brand { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .brand svg { width: 22px; height: 22px; color: #1ED760; }
