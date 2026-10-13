@@ -23,6 +23,8 @@ Spielt Spotify direkt in der Symcon-Kachelvisualisierung und steuert jedes Spoti
 - **iPhone und iPad (Safari und Symcon-App):** Spotify bietet dort keinen Web-Player. Die Kachel zeigt und steuert das Gerät, auf dem Spotify gerade spielt (Handy, Sonos, Echo, Fernseher …), und wechselt es über die Geräteauswahl.
 - **Skripte und Variablen** steuern immer das aktive Gerät; ohne aktives Gerät die Kachel im Browser oder das erste bekannte Gerät. `SPM_TransferPlayback` holt die Wiedergabe auf ein bestimmtes Gerät.
 
+![Musikplayer für Spotify — Spotify-Connect-Auswahl](https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Spotify%20Connect.png)
+
 <p><img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Laeuft%20gerade.png" alt="Musikplayer für Spotify — Läuft gerade" width="32%"> <img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Geraete.png" alt="Musikplayer für Spotify — Geräteauswahl" width="32%"> <img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Warteschlange.png" alt="Musikplayer für Spotify — Warteschlange" width="32%"></p>
 
 ## Einrichtung
