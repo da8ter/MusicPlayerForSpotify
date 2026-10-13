@@ -467,6 +467,7 @@
     try {
       player = await loadPlayer();
     } catch (e) {
+      debug('sdk ' + (host ? 'host' : 'tile') + ': ' + errText(e));
       if (host) {
         host = null;
         win = window;
@@ -477,6 +478,8 @@
       bindPlayer();
       try { local = await player.getCurrentState(); } catch (e) { local = null; }
       if (slot().accountError) premiumMissing = true;
+      // Fehlersuche (doppelte Geräte): wo der Player läuft und mit welcher Geräte-ID
+      setTimeout(() => debug('sdk ' + (host ? 'host' : 'tile') + ' ' + String(slot().deviceId).slice(0, 8)), 5000);
     }
     // Chrome & Co. geben den Kopierschutz (Widevine) nur auf sicheren Seiten frei (https, localhost)
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
