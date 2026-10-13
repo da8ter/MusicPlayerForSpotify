@@ -91,7 +91,8 @@
     for (let attempt = 0; attempt < 2; attempt++) {
       if ((slot().rateLimitUntil || 0) > Date.now()) throw rateLimitError();
       const t = await ensureToken();
-      if (!t) { const e = new Error(T('Not signed in to Spotify')); e.status = 401; throw e; }
+      // Kein Token zu bekommen: die Anmeldung ist abgelaufen oder widerrufen (einmal je Seite melden)
+      if (!t) { loginExpired(); const e = new Error(T('Not signed in to Spotify')); e.status = 401; throw e; }
       const qs = query && Object.keys(query).length ? (path.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString() : '';
       const url = (path.indexOf('https://') === 0 ? path : API + path) + qs;
       const headers = { Authorization: 'Bearer ' + t };
