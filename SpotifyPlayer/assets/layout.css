@@ -61,7 +61,7 @@ html.wide .sidebar {
 }
 .tabdock > * { pointer-events: auto; }
 html.wide .tabdock { display: none; }
-.tabnav, .tab-search, .mini {
+.tabnav, .tab-search, .mini, .top-devices {
   border: 1px solid var(--line);
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
@@ -89,6 +89,15 @@ html.wide .tabdock { display: none; }
 .tab-search { flex: none; width: var(--nav-h); height: var(--nav-h); border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
 .tab-search .tab-icon { width: 22px; height: 22px; }
 .tab-search.active { color: var(--accent); }
+/* Schmal: Geräteauswahl fest oben rechts (breit steht sie unten in der Seitenleiste) */
+.top-devices {
+  position: absolute; top: 0; right: calc(var(--sb-pad) + var(--sbw)); z-index: 5;
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--muted);
+}
+.top-devices svg { width: 19px; height: 19px; }
+.top-devices.on { color: var(--accent); }
+html.wide .top-devices, html.searching .top-devices { display: none; }
+html:not(.wide) .page-title, html:not(.wide) .album-head .txt { padding-right: 46px; }
 
 /* ── Mini-Player: über den Reitern (schmal) bzw. unten im Inhalt (breit) ── */
 .mini {

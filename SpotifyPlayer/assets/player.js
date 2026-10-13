@@ -158,6 +158,8 @@
     // Seitenleiste: wo es gerade spielt (eigene Kachel als „Diese Kachel“)
     $('sideDevicesLabel').textContent = s.deviceId && !s.local ? s.deviceName : s.local ? T('This tile') : T('Devices');
     $('sideDevices').classList.toggle('on', !!s.deviceId && !s.local);
+    $('topDevices').classList.toggle('on', !!s.deviceId && !s.local);
+    $('topDevices').title = $('sideDevicesLabel').textContent;
     updateLove(item && item.type === 'track' ? item.id : '');
     renderTime();
   }
@@ -301,6 +303,8 @@
     $('sideDevices').insertAdjacentHTML('afterbegin', svg('stream', 'side-icon'));
     $('sideDevices').title = T('Devices');
     $('sideDevices').onclick = pickDevice;
+    $('topDevices').innerHTML = svg('stream');
+    $('topDevices').onclick = pickDevice;
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('np').classList.contains('open') && $('sheet').hidden) closePlayer(); });
     // Titel und Interpret öffnen das Album des laufenden Titels
     ['title', 'subtitle'].forEach(id => { $(id).onclick = () => { closePlayer(); window.AMPDetails.openNowPlayingAlbum(); }; });
