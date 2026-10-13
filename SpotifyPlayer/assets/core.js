@@ -249,7 +249,33 @@
   // ── Zustand: SDK-Player, wenn er das aktive Gerät ist, sonst das abgefragte Connect-Gerät ──
   const REPEAT_FROM_API = { off: 0, context: 1, track: 2 };
   const REPEAT_TO_API = { 0: 'off', 1: 'context', 2: 'track' };
+  // Zuletzt gespielt: ohne aktives Gerät zeigt die Kachel den letzten Titel pausiert an (kein Autoplay);
+  // Play startet ihn dann auf dieser Kachel. Quelle: laufende Wiedergabe dieser Sitzung, sonst recently-played.
+  let lastPlayed = null;
   function state() {
+    const live = liveState();
+    if (live.item) {
+      const position = Math.min(live.duration, live.position + (live.playing ? Date.now() - live.at : 0));
+      lastPlayed = { item: live.item, duration: live.duration, position, context: live.context || '' };
+      return live;
+    }
+    if (!lastPlayed) return live;
+    return Object.assign(live, { item: lastPlayed.item, duration: lastPlayed.duration, position: lastPlayed.position, context: lastPlayed.context, last: true });
+  }
+  async function loadLastPlayed() {
+    if (lastPlayed || state().item) return;
+    try {
+      const entry = ((await api('/v1/me/player/recently-played', { limit: 1 })).items || [])[0];
+      const t = entry && entry.track;
+      if (!t || !t.id || lastPlayed) return;
+      lastPlayed = {
+        item: { id: t.id, uri: t.uri, name: t.name, artist: (t.artists || []).map(a => a.name).join(', '), album: t.album ? t.album.name : '', albumId: t.album ? t.album.id : '', images: t.album ? t.album.images : null, type: 'track' },
+        duration: t.duration_ms || 0, position: 0, context: (entry.context && entry.context.uri) || '',
+      };
+      emit('state');
+    } catch (e) { /* bleibt leer */ }
+  }
+  function liveState() {
     const s = slot();
     if (local && local.track_window && local.track_window.current_track) {
       const t = local.track_window.current_track;
@@ -330,6 +356,12 @@
     switch (command) {
       case 'play':
         if (useLocal) return player.resume();
+        if (current.last && current.item) {
+          // Zuletzt gespielten Titel an der gemerkten Stelle starten, im Album bzw. in der Playlist, sonst einzeln
+          const body = /^spotify:(album|playlist):[A-Za-z0-9]{22}$/.test(current.context) ? { context_uri: current.context, offset: { uri: current.item.uri } } : { uris: [current.item.uri] };
+          body.position_ms = Math.max(0, Math.round(current.position || 0));
+          return call('PUT', '/v1/me/player/play', deviceParam(), body);
+        }
         return call('PUT', '/v1/me/player/play', deviceParam());
       case 'pause': return useLocal ? player.pause() : call('PUT', '/v1/me/player/pause', deviceParam());
       case 'next': return useLocal ? player.nextTrack() : call('POST', '/v1/me/player/next', deviceParam());
@@ -485,6 +517,7 @@
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
     await poll();
+    loadLastPlayed();
     schedulePoll(nextPoll());
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') schedulePoll(0); });
     report(true);
