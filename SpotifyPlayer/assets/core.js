@@ -138,7 +138,11 @@
   }
   function clearCache(prefix) {
     const c = cache();
-    Object.keys(c).forEach(key => { if (!prefix || key.indexOf(prefix) === 0) delete c[key]; });
+    // Folgeseiten liegen unter Spotifys absoluter next-Adresse: für den Vergleich ohne API-Präfix
+    Object.keys(c).forEach(key => {
+      const path = key.indexOf(API) === 0 ? key.slice(API.length) : key;
+      if (!prefix || path.indexOf(prefix) === 0) delete c[key];
+    });
   }
   async function api(path, params) {
     const key = path + '?' + JSON.stringify(params || {});
