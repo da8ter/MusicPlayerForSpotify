@@ -134,7 +134,9 @@
             "The new name applies after reloading the visualization": "Der neue Name gilt nach dem Neuladen der Visualisierung",
             "Leave empty for the automatic name": "Leer lassen für den automatischen Namen",
             "restore SpotifyPlayer.key or sign in again": "SpotifyPlayer.key wiederherstellen oder neu anmelden",
-            "Stored sign-in cannot be decrypted (restore SpotifyPlayer.key or sign in again)": "Gespeicherte Anmeldung nicht entschlüsselbar (SpotifyPlayer.key wiederherstellen oder neu anmelden)"
+            "Stored sign-in cannot be decrypted (restore SpotifyPlayer.key or sign in again)": "Gespeicherte Anmeldung nicht entschlüsselbar (SpotifyPlayer.key wiederherstellen oder neu anmelden)",
+            "Profile": "Profil",
+            "OK": "OK"
         }
     }
 }

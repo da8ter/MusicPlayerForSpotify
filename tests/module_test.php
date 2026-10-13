@@ -194,7 +194,7 @@ check(throws(fn () => $module->RequestAction('AddFavorite', json_encode(['type' 
 
 $module->responses = [$json(['id' => 'stephan', 'product' => 'premium']), ['status' => 403, 'body' => '{"error":{"status":403,"message":"Forbidden"}}']];
 $report = $module->TestConnection();
-check(str_contains($report, 'Profil (/v1/me): OK (premium)') && str_contains($report, 'HTTP 403 Forbidden'), 'Verbindung prüfen: eine Zeile je Endpunkt mit Ergebnis');
+check(str_contains($report, 'Profile (/v1/me): OK (premium)') && str_contains($report, 'HTTP 403 Forbidden'), 'Verbindung prüfen: eine Zeile je Endpunkt mit Ergebnis');
 
 $module->responses = [$json(['items' => [['id' => 'x']]])];
 check(json_decode($module->Request('get', '/v1/me/playlists', '{"limit":1}'), true)['items'][0]['id'] === 'x' && str_contains(end($module->http)['url'], 'limit=1'), 'Request: Rohzugriff für Skripte');

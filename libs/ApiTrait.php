@@ -104,20 +104,21 @@ trait MusicPlayerSpotifyApiTrait
             return $this->Translate('Not signed in to Spotify');
         }
         $checks = [
-            'Profil (/v1/me)'                        => ['/v1/me', []],
-            'Geräte (/v1/me/player/devices)'          => ['/v1/me/player/devices', []],
-            'Zuletzt gespielt (recently-played)'      => ['/v1/me/player/recently-played', ['limit' => 1]],
-            'Top-Künstler (me/top/artists)'           => ['/v1/me/top/artists', ['limit' => 1]],
-            'Mediathek (me/library/contains)'         => ['/v1/me/library/contains', ['uris' => 'spotify:track:4uLU6hMCjMI75M1A2tKUQC']],
-            'Playlists (me/playlists)'                => ['/v1/me/playlists', ['limit' => 1]],
-            'Suche (/v1/search)'                      => ['/v1/search', ['q' => 'a', 'type' => 'track', 'limit' => 1]],
+            'Profile'          => ['/v1/me', []],
+            'Devices'          => ['/v1/me/player/devices', []],
+            'Recently played'  => ['/v1/me/player/recently-played', ['limit' => 1]],
+            'Top artists'      => ['/v1/me/top/artists', ['limit' => 1]],
+            'Library'          => ['/v1/me/library/contains', ['uris' => 'spotify:track:4uLU6hMCjMI75M1A2tKUQC']],
+            'Playlists'        => ['/v1/me/playlists', ['limit' => 1]],
+            'Search'           => ['/v1/search', ['q' => 'a', 'type' => 'track', 'limit' => 1]],
         ];
         $lines = [];
-        foreach ($checks as $label => [$path, $query]) {
+        foreach ($checks as $name => [$path, $query]) {
+            $label = $this->Translate($name) . ' (' . $path . ')';
             try {
                 $data = $this->Api('GET', $path, $query);
                 $count = count($data['items'] ?? $data['devices'] ?? $data['tracks']['items'] ?? $data);
-                $lines[] = $label . ': OK' . (isset($data['id']) ? ' (' . (string) ($data['product'] ?? '') . ')' : ' (' . $count . ')');
+                $lines[] = $label . ': ' . $this->Translate('OK') . (isset($data['id']) ? ' (' . (string) ($data['product'] ?? '') . ')' : ' (' . $count . ')');
             } catch (\Throwable $e) {
                 $lines[] = $label . ': ' . $e->getMessage();
             }
