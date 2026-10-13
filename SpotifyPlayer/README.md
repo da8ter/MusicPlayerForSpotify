@@ -67,9 +67,10 @@ Sie steuern immer das aktive Gerät; ohne aktives Gerät die Kachel im Browser o
 
 ## Einrichtung
 
-1. Instanz „Musikplayer für Spotify“ anlegen.
-2. Die Kachel öffnen und **Mit Spotify anmelden** (öffnet ein Fenster bei Spotify; Pop-ups erlauben). Alternativ im Instanzformular *Anmeldelink anzeigen* und den Link im Browser öffnen. Die Anmeldung gilt danach für alle Geräte der Instanz.
-3. Optional Favoriten anlegen: Name und ein `open.spotify.com`-Link (oder `spotify:`-URI) zu einer Playlist, einem Album, einem Titel oder einem Künstler (in Spotify über *Teilen → Link kopieren*).
+1. Bibliothek installieren: im **Module Store** den Kanal **Beta** wählen und genau nach **Music Player for Spotify** suchen. Alternativ über das **Module Control** mit `https://github.com/da8ter/MusicPlayerForSpotify.git`.
+2. Instanz „Musikplayer für Spotify“ anlegen.
+3. Die Kachel öffnen und **Mit Spotify anmelden** (öffnet ein Fenster bei Spotify; Pop-ups erlauben). Alternativ im Instanzformular *Anmeldelink anzeigen* und den Link im Browser öffnen. Die Anmeldung gilt danach für alle Geräte der Instanz.
+4. Optional Favoriten anlegen: Name und ein `open.spotify.com`-Link (oder `spotify:`-URI) zu einer Playlist, einem Album, einem Titel oder einem Künstler (in Spotify über *Teilen → Link kopieren*).
 
 ### Anmeldung
 
