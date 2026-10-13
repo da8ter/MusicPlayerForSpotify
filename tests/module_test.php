@@ -221,4 +221,16 @@ $old->ApplyChanges();
 check($old->attributes['RefreshSecret'] === '' && $old->status === 202 && $old->hooks === [], 'Umstieg: Token der eigenen App verworfen, alter Hook abgemeldet');
 check(throws(fn () => $module->RequestAction('Login', 'x'), InvalidArgumentException::class), 'Anmeldung aus der Kachel: ungültige Kennung abgelehnt');
 
+// ── Kacheltexte: jedes T('…') in den JS-Dateien steht in TILE_TEXTS (sonst nie übersetzt) und in locale.json ──
+$tileTexts = (new ReflectionClassConstant(MusicPlayerForSpotify::class, 'TILE_TEXTS'))->getValue();
+$german = json_decode((string) file_get_contents(__DIR__ . '/../SpotifyPlayer/locale.json'), true)['translations']['de'];
+$used = [];
+foreach (glob(__DIR__ . '/../SpotifyPlayer/assets/*.js') as $file) {
+    preg_match_all("/\\bT\\('((?:[^'\\\\]|\\\\.)*)'\\)/", (string) file_get_contents($file), $m);
+    $used = array_merge($used, array_map('stripslashes', $m[1]));
+}
+$used = array_unique($used);
+check($used !== [] && array_diff($used, $tileTexts) === [], 'Kacheltexte: jedes T() steht in TILE_TEXTS' . (array_diff($used, $tileTexts) ? ' – fehlt: ' . implode(', ', array_diff($used, $tileTexts)) : ''));
+check(array_diff($tileTexts, array_keys($german)) === [], 'Kacheltexte: jeder Eintrag in TILE_TEXTS hat eine deutsche Übersetzung' . (array_diff($tileTexts, array_keys($german)) ? ' – fehlt: ' . implode(', ', array_diff($tileTexts, array_keys($german))) : ''));
+
 echo PHP_EOL . 'All tests passed' . PHP_EOL;
