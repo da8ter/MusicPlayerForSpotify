@@ -111,7 +111,7 @@
     loveFor = id;
     loved = false;
     renderLove();
-    if (id) window.AMPActions.inLibrary({ type: 'track', id }).then(value => { if (loveFor === id) { loved = value === true; renderLove(); } });
+    if (id) window.AMPActions.inLibrary({ type: 'track', id, uri: 'spotify:track:' + id }).then(value => { if (loveFor === id) { loved = value === true; renderLove(); } });
   }
 
   // ── Zustand zeichnen ──
@@ -283,7 +283,7 @@
       const next = !loved;
       loved = next;
       renderLove();
-      window.AMPActions.setLibrary({ type: 'track', id }, next).catch(() => {
+      window.AMPActions.setLibrary({ type: 'track', id, uri: 'spotify:track:' + id }, next).catch(() => {
         if (loveFor === id) { loved = !next; renderLove(); }
         notice(T('Could not save'));
       });
