@@ -132,7 +132,8 @@
             "Name this device": "Dieses Gerät benennen",
             "Save": "Speichern",
             "The new name applies after reloading the visualization": "Der neue Name gilt nach dem Neuladen der Visualisierung",
-            "Leave empty for the automatic name": "Leer lassen für den automatischen Namen"
+            "Leave empty for the automatic name": "Leer lassen für den automatischen Namen",
+            "please sign in again": "bitte neu anmelden"
         }
     }
 }

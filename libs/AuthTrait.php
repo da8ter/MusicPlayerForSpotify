@@ -73,6 +73,12 @@ trait MusicPlayerSpotifyAuthTrait
         $refresh = $this->Secret('RefreshSecret', 'Refresh');
         if ($refresh === '') {
             $this->SetTimerInterval('RefreshToken', 0);
+            // Gespeichert, aber nicht zu entschlüsseln (Schlüsseldatei fehlt oder ist beschädigt, z. B. nach
+            // Wiederherstellung auf einem anderen Rechner): sichtbar abmelden statt still ohne Token weiterzulaufen
+            if ($this->SignedIn()) {
+                $this->LogMessage($this->Translate('Key store not usable') . ': ' . $this->Translate('please sign in again'), KL_ERROR);
+                $this->Logout();
+            }
             return false;
         }
         try {
