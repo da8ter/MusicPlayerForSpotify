@@ -265,7 +265,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
                 if (!preg_match('/^[A-Za-z0-9_-]{1,80}$/', $device)) {
                     throw new InvalidArgumentException('Invalid device');
                 }
-                $this->SetBuffer('WantedDevice', $device);
+                $this->SetBuffer('WantedDevice', $device . '|' . time());
                 return;
             case 'AddFavorite':
                 $this->QueueFavorite((string) $Value);
@@ -353,7 +353,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         }
         foreach (is_array($devices) ? $devices : [] as $device) {
             if (is_array($device) && is_string($device['id'] ?? null) && mb_strtolower((string) ($device['name'] ?? '')) === mb_strtolower(trim($DeviceName))) {
-                $this->SetBuffer('WantedDevice', $device['id']);
+                $this->SetBuffer('WantedDevice', $device['id'] . '|' . time());
                 return $this->SendCommand('transfer');
             }
         }

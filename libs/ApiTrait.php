@@ -8,6 +8,9 @@ declare(strict_types=1);
  */
 trait MusicPlayerSpotifyApiTrait
 {
+    // Eine Gerätewahl gilt nur für den Wechsel, danach zählt wieder das aktive Gerät
+    private const WANTED_DEVICE_TTL = 60;
+
     private const API_URL = 'https://api.spotify.com';
     private const REPEAT_TO_SPOTIFY = [0 => 'off', 1 => 'context', 2 => 'track'];
     private const REPEAT_FROM_SPOTIFY = ['off' => 0, 'context' => 1, 'track' => 2];
@@ -228,10 +231,16 @@ trait MusicPlayerSpotifyApiTrait
         return true;
     }
 
-    /** Aktives Gerät, sonst das SDK-Gerät der zuletzt gemeldeten Kachel, sonst das erste bekannte. */
+    /**
+     * Gerade gewähltes Gerät (Geräteauswahl, TransferPlayback; nur 60 s, bis Spotify es als aktiv meldet),
+     * sonst das aktive, sonst das SDK-Gerät der zuletzt gemeldeten Kachel, sonst das erste bekannte.
+     */
     private function TargetDevice(): string
     {
-        $wanted = $this->GetBuffer('WantedDevice');
+        [$wanted, $since] = array_pad(explode('|', $this->GetBuffer('WantedDevice'), 2), 2, '0');
+        if (time() - (int) $since > self::WANTED_DEVICE_TTL) {
+            $wanted = '';
+        }
         $devices = $this->Api('GET', '/v1/me/player/devices')['devices'] ?? [];
         $devices = is_array($devices) ? array_filter($devices, static fn ($d): bool => is_array($d) && is_string($d['id'] ?? null) && ($d['is_restricted'] ?? false) !== true) : [];
         // array_values: array_filter behält die Schlüssel, sonst fehlt $ids[0], wenn das erste Gerät herausfällt
