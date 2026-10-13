@@ -380,7 +380,9 @@
       case 'playItem': {
         if (ITEM_TYPES.indexOf(args.type) < 0 || !/^[A-Za-z0-9]{22}$/.test(String(args.id))) return Promise.resolve();
         const uri = 'spotify:' + args.type + ':' + args.id;
-        slot().context = uri;
+        // Nur als Brücke, bis Spotify den neuen Kontext meldet (isCurrent); Titel erkennt isCurrent an der ID
+        slot().context = args.type === 'track' ? '' : uri;
+        slot().contextAt = Date.now();
         const body = args.type === 'track' ? { uris: [uri] } : { context_uri: uri };
         // Titel aus einer Liste (Top-Titel, Suche …): die ganze Liste ab diesem Titel, wie in der Spotify-App;
         // ein einzelner Titel ergäbe eine Warteschlange, die nur ihn selbst wiederholt
@@ -543,7 +545,9 @@
       if (!play) return false;
       const c = state();
       const uri = 'spotify:' + play.type + ':' + play.id;
-      return (c.context && c.context === uri) || slot().context === uri && !!c.item || (play.type === 'track' && !!c.item && c.item.id === play.id);
+      // Gerade gestarteter Kontext zählt nur, bis Spotify einen meldet (höchstens 15 s); sonst gilt der gemeldete
+      const started = !c.context && !c.last && !!c.item && slot().context === uri && Date.now() - (slot().contextAt || 0) < 15000;
+      return (c.context && !c.last && c.context === uri) || started || (play.type === 'track' && !!c.item && !c.last && c.item.id === play.id);
     },
   };
 })();
