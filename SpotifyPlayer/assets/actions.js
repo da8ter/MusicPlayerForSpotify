@@ -82,6 +82,7 @@
           const playlist = await write('POST', '/v1/me/playlists', {}, { name, public: false });
           await write('POST', '/v1/playlists/' + enc(playlist.id) + '/items', {}, { uris: (await urisOf(ref)).slice(0, 100) });
           AMP.notify(T('Playlist created') + ': ' + name);
+          window.AMPUI.refreshPlaylists();
         } catch (e) { AMP.notify(T('Could not change the playlist')); }
       }, 'primary'));
       box.appendChild(create);
@@ -165,7 +166,7 @@
         try {
           await write('PUT', '/v1/playlists/' + enc(ref.id), {}, { name });
           AMP.notify(T('Playlist renamed'));
-          window.AMPUI.rerender();
+          window.AMPUI.refreshPlaylists();
         } catch (e) { AMP.notify(T('Could not change the playlist')); }
       }, 'primary'));
       box.appendChild(form);
@@ -178,6 +179,7 @@
       await write('DELETE', '/v1/me/library', { uris: ref.uri });
       AMP.notify(T('Playlist deleted'));
       window.AMPUI.select('playlists');
+      window.AMPUI.refreshPlaylists();
     } catch (e) { AMP.notify(T('Could not change the playlist')); }
   }
   async function removeFromPlaylist(ref) {

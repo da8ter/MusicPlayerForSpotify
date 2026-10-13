@@ -369,6 +369,14 @@
     }).catch(() => { sidePlaylists = null; });
   }
 
+  // Nach Anlegen, Umbenennen oder Löschen: Seitenleiste neu laden und Ansichten mit Playlists neu zeigen
+  // (Detailseiten bleiben stehen)
+  function refreshPlaylists() {
+    sidePlaylists = null;
+    buildNav();
+    if (['home', 'library', 'playlists'].indexOf(view) >= 0 && !$('panel').classList.contains('detail')) showView(view);
+  }
+
   function buildNav() {
     const active = activeKey();
     if (wide) {
@@ -461,6 +469,7 @@
     tab: () => view,
     wide: () => wide,
     rerender: () => showView(view),
+    refreshPlaylists,
     setBackdrop,
     backdrop: () => backdropOverride,
   };
