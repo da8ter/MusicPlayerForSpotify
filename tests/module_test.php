@@ -100,24 +100,30 @@ check($module->RefreshAccessToken() && end($module->updates)['type'] === 'token'
 parse_str((string) $module->http[0]['body'], $post);
 check($post === ['refresh_token' => 'REFRESH1xxxxxxxxxxxxxxxxxxx'] && $module->http[0]['url'] === 'https://oauth.ipmagic.de/access_token/spotify', 'Erneuerung beim Symcon-Dienst mit dem gespeicherten Refresh-Token');
 $module->http = [];
-$module->responses = [['status' => 401, 'body' => '{"error":{"status":401}}'], $json(['access_token' => 'ACCESS3xxxxxxxxxxxxxxxxxxxx', 'expires_in' => 3600]), $json(['devices' => [['id' => 'dev1', 'name' => 'Küche', 'is_active' => true]]]), ['status' => 204, 'body' => '']];
-check($module->Play() && count($module->http) === 4 && $module->http[3]['method'] === 'PUT' && str_contains($module->http[3]['url'], '/v1/me/player/play?device_id=dev1'), 'Web API: bei 401 Token erneuern und wiederholen; Befehl geht an das aktive Gerät');
+$module->responses = [['status' => 401, 'body' => '{"error":{"status":401}}'], $json(['access_token' => 'ACCESS3xxxxxxxxxxxxxxxxxxxx', 'expires_in' => 3600]), ['status' => 204, 'body' => '']];
+check($module->Play() && count($module->http) === 3 && $module->http[2]['method'] === 'PUT' && str_ends_with($module->http[2]['url'], '/v1/me/player/play'), 'Web API: bei 401 Token erneuern und wiederholen; Befehl ohne device_id an das aktive Gerät, ohne Geräteliste');
 check($module->timers['PollOnce'] === 1500, 'Befehl: Variablen werden kurz danach nachgezogen');
 
 // ── Befehle und Geräte ──
 $module->http = [];
-$module->responses = [$json(['devices' => []])];
+$module->responses = [['status' => 404, 'body' => '{"error":{"status":404,"reason":"NO_ACTIVE_DEVICE"}}'], $json(['devices' => []])];
 check(!$module->Next() && str_contains(end($module->logs), 'No Spotify device'), 'Ohne Gerät: false mit Logmeldung');
 $module->http = [];
-$module->responses = [$json(['devices' => [['id' => 'dev1', 'name' => 'Küche', 'is_active' => false], ['id' => 'tile1', 'name' => 'Symcon', 'is_active' => false]]]), ['status' => 204, 'body' => '']];
+$module->responses = [['status' => 404, 'body' => '{"error":{"status":404,"reason":"NO_ACTIVE_DEVICE"}}'], $json(['devices' => [['id' => 'echo', 'name' => 'Echo', 'is_restricted' => true], ['id' => 'dev1', 'name' => 'Küche', 'is_active' => false], ['id' => 'tile1', 'name' => 'Symcon', 'is_active' => false]]]), ['status' => 204, 'body' => '']];
 $module->RequestAction('State', json_encode(['playing' => true, 'title' => 'Song', 'deviceId' => 'tile1', 'local' => true, 'volume' => 250, 'repeat' => 9, 'cover' => 'http://x']));
 check($module->values['Volume'] === 100 && $module->values['Repeat'] === 2 && $module->values['Cover'] === '' && $module->values['Playback'] === 2, 'Zustand aus der Kachel: Werte begrenzt, nur https-Cover');
 check($module->PlayFavorite(0) && json_decode((string) end($module->http)['body'], true) === ['context_uri' => 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M'] && str_contains(end($module->http)['url'], 'device_id=tile1'), 'Favorit: Playlist als Kontext auf dem Kachel-Gerät, wenn kein Gerät aktiv ist');
-$module->responses = [$json(['devices' => [['id' => 'dev1', 'name' => 'Küche', 'is_active' => true]]]), ['status' => 204, 'body' => '']];
+$module->responses = [['status' => 204, 'body' => '']];
 check($module->PlayURL('spotify:track:4uLU6hMCjMI75M1A2tKUQC') && json_decode((string) end($module->http)['body'], true) === ['uris' => ['spotify:track:4uLU6hMCjMI75M1A2tKUQC']], 'PlayURL: Titel als uris');
 check(!$module->PlayURL('https://example.com/x') && !$module->PlayFavorite(1), 'Ungültiger Link und fehlender Favorit: false');
-$module->responses = [$json(['devices' => [['id' => 'dev1', 'name' => 'Küche', 'is_active' => false]]]), $json(['devices' => [['id' => 'dev1', 'name' => 'Küche', 'is_active' => false]]]), ['status' => 204, 'body' => '']];
-check($module->TransferPlayback('küche') && json_decode((string) end($module->http)['body'], true) === ['device_ids' => ['dev1'], 'play' => true], 'TransferPlayback: Gerät nach Namen (Groß-/Kleinschreibung egal)');
+$module->http = [];
+$module->responses = [$json(['devices' => [['id' => 'dev1', 'name' => 'Küche', 'is_active' => false]]]), ['status' => 204, 'body' => '']];
+check($module->TransferPlayback('küche') && count($module->http) === 2 && json_decode((string) end($module->http)['body'], true) === ['device_ids' => ['dev1'], 'play' => true], 'TransferPlayback: Gerät nach Namen (Groß-/Kleinschreibung egal), Geräteliste nur einmal');
+$module->responses = [['status' => 204, 'body' => '']];
+check($module->Pause() && str_contains(end($module->http)['url'], 'device_id=dev1'), 'Gerade gewähltes Gerät geht vor');
+$module->buffers['WantedDevice'] = 'dev1|' . (time() - 120);
+$module->responses = [['status' => 204, 'body' => '']];
+check($module->Pause() && !str_contains(end($module->http)['url'], 'device_id'), 'Gerätewahl verfällt nach 60 s, dann wieder das aktive Gerät');
 check(throws(fn () => $module->RequestAction('Device', 'x y'), InvalidArgumentException::class) && throws(fn () => $module->RequestAction('Nope', 1), InvalidArgumentException::class), 'RequestAction: ungültige Geräte-ID und unbekannter Ident abgelehnt');
 $module->responses = [$json(['is_playing' => false, 'item' => ['name' => 'Titel', 'artists' => [['name' => 'A'], ['name' => 'B']], 'album' => ['name' => 'Alb', 'images' => [['url' => 'https://i.scdn.co/x']]]], 'device' => ['id' => 'dev1', 'name' => 'Küche', 'volume_percent' => 40], 'shuffle_state' => true, 'repeat_state' => 'context'])];
 check($module->UpdateState() && $module->values['Artist'] === 'A, B' && $module->values['Volume'] === 40 && $module->values['Repeat'] === 1 && $module->values['Playback'] === 3 && $module->values['Device'] === 'Küche', 'UpdateState: Zustand des aktiven Geräts in den Variablen');

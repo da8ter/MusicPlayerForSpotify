@@ -354,7 +354,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         foreach (is_array($devices) ? $devices : [] as $device) {
             if (is_array($device) && is_string($device['id'] ?? null) && mb_strtolower((string) ($device['name'] ?? '')) === mb_strtolower(trim($DeviceName))) {
                 $this->SetBuffer('WantedDevice', $device['id'] . '|' . time());
-                return $this->SendCommand('transfer');
+                return $this->SendCommand('transfer', ['device' => $device['id']]);
             }
         }
         $this->LogMessage(sprintf($this->Translate('Spotify device "%s" not found'), $DeviceName), KL_WARNING);
@@ -452,8 +452,9 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->SetIfChanged('Repeat', max(0, min(2, (int) ($state['repeat'] ?? 0))));
         $this->SetIfChanged('Device', $text($state['device'] ?? '', 60));
         $deviceId = $text($state['deviceId'] ?? '', 80);
-        if (preg_match('/^[A-Za-z0-9_-]{1,80}$/', $deviceId)) {
-            $this->SetBuffer(($state['local'] ?? false) === true ? 'TileDevice' : 'ActiveDevice', $deviceId);
+        // Das SDK-Gerät der Kachel: Rückfall für Befehle, wenn kein Gerät aktiv ist
+        if (($state['local'] ?? false) === true && preg_match('/^[A-Za-z0-9_-]{1,80}$/', $deviceId)) {
+            $this->SetBuffer('TileDevice', $deviceId);
         }
     }
 
@@ -464,7 +465,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             $this->SetIfChanged($ident, '');
         }
         $this->SetIfChanged('Playback', 1);
-        foreach (['TileDevice', 'ActiveDevice', 'WantedDevice', 'PendingFavorites'] as $buffer) {
+        foreach (['TileDevice', 'WantedDevice', 'PendingFavorites'] as $buffer) {
             $this->SetBuffer($buffer, '');
         }
     }

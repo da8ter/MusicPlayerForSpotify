@@ -185,9 +185,6 @@ trait MusicPlayerSpotifyApiTrait
         $this->SetIfChanged('Shuffle', ($State['shuffle_state'] ?? false) === true);
         $this->SetIfChanged('Repeat', self::REPEAT_FROM_SPOTIFY[(string) ($State['repeat_state'] ?? 'off')] ?? 0);
         $this->SetIfChanged('Device', mb_substr((string) ($device['name'] ?? ''), 0, 60));
-        if (is_string($device['id'] ?? null) && $device['id'] !== '') {
-            $this->SetBuffer('ActiveDevice', $device['id']);
-        }
     }
 
     /**
@@ -200,27 +197,22 @@ trait MusicPlayerSpotifyApiTrait
             $this->LogMessage($this->Translate('Not signed in to Spotify'), KL_WARNING);
             return false;
         }
+        // Ohne device_id nimmt Spotify das aktive Gerät; die Geräteliste kostet einen Abruf und kommt nur,
+        // wenn keins aktiv ist (404 NO_ACTIVE_DEVICE). Ein gerade gewähltes Gerät geht vor.
+        $device = $Command === 'transfer' ? (string) ($Args['device'] ?? '') : $this->WantedDevice();
         try {
-            $device = $this->TargetDevice();
-            if ($device === '') {
-                $this->LogMessage($this->Translate('No Spotify device available: open the tile or start Spotify on a device'), KL_WARNING);
-                return false;
-            }
-            $q = ['device_id' => $device];
-            switch ($Command) {
-                case 'play': $this->Api('PUT', '/v1/me/player/play', $q); break;
-                case 'pause': $this->Api('PUT', '/v1/me/player/pause', $q); break;
-                case 'next': $this->Api('POST', '/v1/me/player/next', $q); break;
-                case 'previous': $this->Api('POST', '/v1/me/player/previous', $q); break;
-                case 'volume': $this->Api('PUT', '/v1/me/player/volume', $q + ['volume_percent' => max(0, min(100, (int) ($Args['value'] ?? 0)))]); break;
-                case 'shuffle': $this->Api('PUT', '/v1/me/player/shuffle', $q + ['state' => ($Args['value'] ?? false) ? 'true' : 'false']); break;
-                case 'repeat': $this->Api('PUT', '/v1/me/player/repeat', $q + ['state' => self::REPEAT_TO_SPOTIFY[(int) ($Args['value'] ?? 0)] ?? 'off']); break;
-                case 'playItem':
-                    $uri = SpotifyLink::Uri((string) $Args['type'], (string) $Args['id']);
-                    $this->Api('PUT', '/v1/me/player/play', $q, $Args['type'] === 'track' ? ['uris' => [$uri]] : ['context_uri' => $uri]);
-                    break;
-                case 'transfer': $this->Api('PUT', '/v1/me/player', [], ['device_ids' => [$device], 'play' => true]); break;
-                default: throw new InvalidArgumentException('Invalid command ' . $Command);
+            try {
+                $this->RunCommand($Command, $Args, $device);
+            } catch (RuntimeException $e) {
+                if ($device !== '' || !str_starts_with($e->getMessage(), 'HTTP 404')) {
+                    throw $e;
+                }
+                $device = $this->TargetDevice();
+                if ($device === '') {
+                    $this->LogMessage($this->Translate('No Spotify device available: open the tile or start Spotify on a device'), KL_WARNING);
+                    return false;
+                }
+                $this->RunCommand($Command, $Args, $device);
             }
         } catch (\Throwable $e) {
             $this->LogMessage($this->Translate('Spotify command failed') . ' (' . $Command . '): ' . $e->getMessage(), KL_WARNING);
@@ -231,24 +223,47 @@ trait MusicPlayerSpotifyApiTrait
         return true;
     }
 
-    /**
-     * Gerade gewähltes Gerät (Geräteauswahl, TransferPlayback; nur 60 s, bis Spotify es als aktiv meldet),
-     * sonst das aktive, sonst das SDK-Gerät der zuletzt gemeldeten Kachel, sonst das erste bekannte.
-     */
-    private function TargetDevice(): string
+    /** @param array<string, mixed> $Args */
+    private function RunCommand(string $Command, array $Args, string $Device): void
+    {
+        $q = $Device !== '' ? ['device_id' => $Device] : [];
+        switch ($Command) {
+            case 'play': $this->Api('PUT', '/v1/me/player/play', $q); break;
+            case 'pause': $this->Api('PUT', '/v1/me/player/pause', $q); break;
+            case 'next': $this->Api('POST', '/v1/me/player/next', $q); break;
+            case 'previous': $this->Api('POST', '/v1/me/player/previous', $q); break;
+            case 'volume': $this->Api('PUT', '/v1/me/player/volume', $q + ['volume_percent' => max(0, min(100, (int) ($Args['value'] ?? 0)))]); break;
+            case 'shuffle': $this->Api('PUT', '/v1/me/player/shuffle', $q + ['state' => ($Args['value'] ?? false) ? 'true' : 'false']); break;
+            case 'repeat': $this->Api('PUT', '/v1/me/player/repeat', $q + ['state' => self::REPEAT_TO_SPOTIFY[(int) ($Args['value'] ?? 0)] ?? 'off']); break;
+            case 'playItem':
+                $uri = SpotifyLink::Uri((string) $Args['type'], (string) $Args['id']);
+                $this->Api('PUT', '/v1/me/player/play', $q, $Args['type'] === 'track' ? ['uris' => [$uri]] : ['context_uri' => $uri]);
+                break;
+            case 'transfer':
+                if ($Device === '') {
+                    throw new RuntimeException('HTTP 404');
+                }
+                $this->Api('PUT', '/v1/me/player', [], ['device_ids' => [$Device], 'play' => true]);
+                break;
+            default: throw new InvalidArgumentException('Invalid command ' . $Command);
+        }
+    }
+
+    /** Gerade gewähltes Gerät (Geräteauswahl, TransferPlayback); gilt nur für den Wechsel, höchstens 60 s. */
+    private function WantedDevice(): string
     {
         [$wanted, $since] = array_pad(explode('|', $this->GetBuffer('WantedDevice'), 2), 2, '0');
-        if (time() - (int) $since > self::WANTED_DEVICE_TTL) {
-            $wanted = '';
-        }
+        return time() - (int) $since <= self::WANTED_DEVICE_TTL ? $wanted : '';
+    }
+
+    /** Wenn keins aktiv ist: das SDK-Gerät der zuletzt gemeldeten Kachel, sonst das erste bekannte. */
+    private function TargetDevice(): string
+    {
         $devices = $this->Api('GET', '/v1/me/player/devices')['devices'] ?? [];
         $devices = is_array($devices) ? array_filter($devices, static fn ($d): bool => is_array($d) && is_string($d['id'] ?? null) && ($d['is_restricted'] ?? false) !== true) : [];
         // array_values: array_filter behält die Schlüssel, sonst fehlt $ids[0], wenn das erste Gerät herausfällt
         $devices = array_values($devices);
         $ids = array_map(static fn (array $d): string => $d['id'], $devices);
-        if ($wanted !== '' && in_array($wanted, $ids, true)) {
-            return $wanted;
-        }
         foreach ($devices as $d) {
             if (($d['is_active'] ?? false) === true) {
                 return $d['id'];
