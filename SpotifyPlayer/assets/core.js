@@ -381,6 +381,10 @@
         const uri = 'spotify:' + args.type + ':' + args.id;
         slot().context = uri;
         const body = args.type === 'track' ? { uris: [uri] } : { context_uri: uri };
+        // Titel aus einer Liste (Top-Titel, Suche …): die ganze Liste ab diesem Titel, wie in der Spotify-App;
+        // ein einzelner Titel ergäbe eine Warteschlange, die nur ihn selbst wiederholt
+        const list = args.type === 'track' && Array.isArray(args.list) ? args.list.filter(u => /^spotify:track:[A-Za-z0-9]{22}$/.test(u)).slice(0, 100) : [];
+        if (list.length > 1 && list.indexOf(uri) >= 0) { body.uris = list; body.offset = { uri }; }
         if (args.type !== 'track' && Number.isInteger(args.index) && args.index > 0) body.offset = { position: args.index };
         return call('PUT', '/v1/me/player/play', deviceParam(), body);
       }

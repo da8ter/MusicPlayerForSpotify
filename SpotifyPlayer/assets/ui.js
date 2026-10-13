@@ -135,6 +135,7 @@
   function renderList(items, emptyText, target) {
     const panel = target || $('panel');
     if (!items.length) { panel.insertAdjacentHTML('beforeend', '<p class="empty">' + esc(emptyText) + '</p>'); return; }
+    const trackList = items.filter(i => i.play && i.play.type === 'track').map(i => 'spotify:track:' + i.play.id);
     items.forEach(item => {
       const row = document.createElement('button');
       row.className = 'row';
@@ -143,6 +144,7 @@
         + '<span class="txt"><b>' + esc(item.name) + '</b><small>' + esc(item.sub) + '</small></span>'
         + (item.ref ? moreButton() : '');
       if (item.play) row.dataset.play = JSON.stringify(item.play);
+      if (item.play && item.play.type === 'track' && trackList.length > 1) item.play.list = trackList;
       row.onclick = item.onClick || (e => {
         const target = e.target instanceof Element ? e.target : null;
         if (target && target.closest('.more')) window.AMPActions.menu(item.ref);
@@ -159,6 +161,7 @@
   function renderCards(resources, target, layout, subFn) {
     const box = document.createElement('div');
     box.className = layout === 'shelf' ? 'shelf' : 'grid';
+    const trackList = resources.filter(r => r && r.type === 'track' && r.id).map(r => 'spotify:track:' + r.id);
     resources.forEach(resource => {
       const type = resource && TYPES[resource.type];
       if (!type || !resource.id) return;
@@ -173,6 +176,7 @@
       const open = type === 'artist' ? () => window.AMPDetails.showArtist(resource)
         : (type === 'album' || type === 'playlist') ? () => window.AMPDetails.showCollection(resource) : () => playOrToggle(play);
       if (type !== 'artist') card.dataset.play = JSON.stringify(play);
+      if (type === 'track' && trackList.length > 1) play.list = trackList;
       card.querySelector('.card-art').onclick = type === 'artist' ? open : () => playOrToggle(play);
       card.querySelector('.card-txt').onclick = open;
       if (type === 'album') {

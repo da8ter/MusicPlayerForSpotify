@@ -201,7 +201,9 @@
       const data = await AMP.call('GET', '/v1/me/player/queue');
       const scroll = list.scrollTop;
       list.innerHTML = '';
-      ui.renderList((data.queue || []).filter(t => t && t.id).map(t => ({
+      const now = AMP.state();
+      const nowId = now.item && now.repeat !== 2 ? now.item.id : '';
+      ui.renderList((data.queue || []).filter(t => t && t.id && t.id !== nowId).map(t => ({
         name: t.name || '', sub: (t.artists || []).map(a => a.name).join(', '), art: ui.imagesOf(t),
         ref: { type: 'track', id: String(t.id), uri: t.uri, name: t.name || '' },
         onClick: e => { if (e.target instanceof Element && e.target.closest('.more')) window.AMPActions.menu({ type: 'track', id: String(t.id), uri: t.uri, name: t.name || '' }); },
