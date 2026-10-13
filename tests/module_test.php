@@ -173,7 +173,7 @@ check(!preg_match('#/\*(CONFIG|WEBAPI|CORE|ICONS|NAV|ACTIONS|UI|DETAILS|VIEWS|PL
 check(substr_count($html, '</script>') === substr_count($html, '<script'), 'Kachel: Skriptblöcke bleiben geschlossen');
 preg_match('#window\.SPM_CONFIG = (.*?);</script>#s', $html, $m);
 $config = json_decode($m[1], true);
-check($config['instance'] === 12345 && $config['mode'] === 'player' && $config['accessToken'] === 'ACCESS3xxxxxxxxxxxxxxxxxxxx' && $config['userId'] === 'stephan' && $config['premium'] === true && count($config['favorites']) === 2, 'Kachel: angemeldet mit Token, Profil und Favoriten');
+check($config['instance'] === 12345 && $config['mode'] === 'player' && $config['accessToken'] === 'ACCESS3xxxxxxxxxxxxxxxxxxxx' && $config['userId'] === 'stephan' && !isset($config['premium']) && count($config['favorites']) === 2, 'Kachel: angemeldet mit Token, Profil und Favoriten');
 // ── Übernehmen: nur bei Änderungen am Anmeldestand neu laden, geänderte Favoriten als Nachricht ──
 // Die Anmeldung hat die Kacheln schon per auth-Push neu geladen und sich den Stand gemerkt
 $before = count($module->updates);

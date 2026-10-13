@@ -176,7 +176,6 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             // Sichtbar für jeden mit Zugang zur Visualisierung: dieselben Personen bedienen den Player.
             'accessToken' => $signedIn ? $this->AccessToken(true) : '',
             'expiresAt'   => $signedIn ? $this->ReadAttributeInteger('AccessExpiry') : 0,
-            'premium'     => $this->ReadAttributeString('Product') === 'premium',
             'playerName'  => mb_substr(trim($this->ReadPropertyString('PlayerName')) ?: 'Symcon', 0, 60),
             'userId'      => $this->ReadAttributeString('UserID'),
             'favorites'   => $this->Favorites(),
