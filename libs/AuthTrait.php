@@ -75,10 +75,14 @@ trait MusicPlayerSpotifyAuthTrait
         if ($refresh === '') {
             $this->SetTimerInterval('RefreshToken', 0);
             // Gespeichert, aber nicht zu entschlüsseln (Schlüsseldatei fehlt oder ist beschädigt, z. B. nach
-            // Wiederherstellung auf einem anderen Rechner): sichtbar abmelden statt still ohne Token weiterzulaufen
+            // Wiederherstellung auf einem anderen Rechner): sichtbar melden, aber nichts löschen. Ist die Datei
+            // nur vorübergehend nicht lesbar oder wird sie wiederhergestellt, geht es ohne neue Anmeldung weiter.
             if ($this->SignedIn()) {
-                $this->LogMessage($this->Translate('Key store not usable') . ': ' . $this->Translate('please sign in again'), KL_ERROR);
-                $this->Logout();
+                if ($this->GetBuffer('KeyError') === '') {
+                    $this->SetBuffer('KeyError', '1');
+                    $this->LogMessage($this->Translate('Key store not usable') . ': ' . $this->Translate('restore SpotifyPlayer.key or sign in again'), KL_ERROR);
+                }
+                $this->SetStatus(self::STATUS_KEY_ERROR);
             }
             return false;
         }
@@ -100,6 +104,7 @@ trait MusicPlayerSpotifyAuthTrait
             }
             return false;
         }
+        $this->SetBuffer('KeyError', '');
         $this->ScheduleRefresh();
         $this->PushToTiles(['type' => 'token', 'accessToken' => $this->AccessToken(false), 'expiresAt' => $this->ReadAttributeInteger('AccessExpiry')]);
         return true;

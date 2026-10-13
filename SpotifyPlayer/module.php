@@ -22,6 +22,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
 
     private const STATUS_NO_CONNECT = 201;
     private const STATUS_SIGNED_OUT = 202;
+    private const STATUS_KEY_ERROR = 203;
     private const PLAYBACK_COMMANDS = [0 => 'previous', 1 => 'pause', 2 => 'play', 3 => 'pause', 4 => 'next'];
     private const REFRESH_MIN_INTERVAL = 20;
 

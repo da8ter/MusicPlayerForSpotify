@@ -91,6 +91,11 @@
             "code": 202,
             "icon": "inactive",
             "caption": "Not signed in to Spotify (open the tile and sign in)"
+        },
+        {
+            "code": 203,
+            "icon": "error",
+            "caption": "Stored sign-in cannot be decrypted (restore SpotifyPlayer.key or sign in again)"
         }
     ]
 }
