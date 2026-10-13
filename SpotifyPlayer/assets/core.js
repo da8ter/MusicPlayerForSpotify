@@ -208,9 +208,18 @@
     if (s.state === 'new') inject(s);
     for (let i = 0; i < 300; i++) {
       if (s.state === 'ready') return s.player;
+      // Die Kachel, die den Player einrichtet, kann mitten im Verbinden verworfen werden (Kategoriewechsel):
+      // dann läuft ihre Fortsetzung nie. Nach 20 s übernimmt eine andere Kachel und trennt den halben Player.
+      if (s.state === 'configuring' && Date.now() - (s.configuringSince || 0) > 20000) {
+        if (s.pending) { try { s.pending.disconnect(); } catch (e) { /* egal */ } s.pending = null; }
+        s.state = 'loading';
+      }
       if (s.state === 'error') throw new Error(s.error);
       if (s.state === 'loading' && win[SDK_FLAG] === 'ready' && win.Spotify && win.Spotify.Player) {
         s.state = 'configuring';
+        const since = s.configuringSince = Date.now();
+        // Von einer anderen Kachel übernommen (siehe oben): dieses Ergebnis verwerfen
+        const superseded = () => s.state !== 'configuring' || s.configuringSince !== since;
         try {
           const options = new win.Object();
           options.name = window.AMPPlayer ? await window.AMPPlayer.deviceName() : (cfg.playerName || 'Symcon');
@@ -219,13 +228,16 @@
           // Token-Rückruf und Geräte-ID gehören dem Player-Fenster: das SDK hält keine Kachel fest
           options.getOAuthToken = new win.Function('cb', 'cb(window["' + SLOT + '"].token);');
           const p = new win.Spotify.Player(options);
+          s.pending = p;
           p.addListener('ready', new win.Function('e', 'window["' + SLOT + '"].deviceId = e.device_id;'));
           p.addListener('not_ready', new win.Function('e', 'var s = window["' + SLOT + '"]; if (s.deviceId === e.device_id) s.deviceId = "";'));
           p.addListener('account_error', new win.Function('e', 'window["' + SLOT + '"].accountError = true;'));
           if (!(await p.connect())) throw new Error('connect');
+          if (superseded()) { try { p.disconnect(); } catch (e) { /* egal */ } continue; }
+          s.pending = null;
           s.player = p;
           s.state = 'ready';
-        } catch (e) { s.state = 'error'; s.error = errText(e); }
+        } catch (e) { if (!superseded()) { s.state = 'error'; s.error = errText(e); } }
         continue;
       }
       if (s.state === 'loading' && !win.Spotify && Date.now() - (s.loadingSince || 0) > 15000) inject(s);
