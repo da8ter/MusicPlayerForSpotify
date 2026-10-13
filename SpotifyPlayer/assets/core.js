@@ -359,8 +359,10 @@
   function nextPoll() {
     // Nachlauf nach einem Befehl, der während einer laufenden Abfrage kam (poll setzt pollAgain)
     if (pollAgain) { pollAgain = false; return 300; }
-    const every = local ? 30000 : 10000;
-    if (local || !remote || !remote.is_playing || !remote.item) return every;
+    // 10 s nur, solange ein anderes Gerät spielt; spielt nichts (oder die Kachel selbst), ändert sich von
+    // allein wenig: 30 s schonen das Kontingent, das alle Installationen der Symcon-App teilen
+    if (local || !remote || !remote.is_playing || !remote.item) return 30000;
+    const every = 10000;
     const left = (remote.item.duration_ms || 0) - (remote.progress_ms || 0) - (Date.now() - remoteAt);
     return left > 0 && left < every ? left + 1500 : every;
   }
