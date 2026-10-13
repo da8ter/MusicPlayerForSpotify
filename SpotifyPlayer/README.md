@@ -1,6 +1,16 @@
 # Musikplayer für Spotify
 
+![Musikplayer für Spotify — Start](https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Start.png)
+
 Spielt Spotify direkt in der Symcon-Kachelvisualisierung und steuert jedes Spotify-Connect-Gerät. Die Kachel ist aufgebaut wie die Musik-Apps: Start (zuletzt gespielt, Top-Künstler, Top-Titel, deine Playlists, Alben und Künstler), Neu (Neuerscheinungen, neue Alben deiner Künstler, zuletzt gespeichert), Entdecken (beliebte Playlists und Spotifys Kategorien wie Charts, Stimmung und Genres), Mediathek (Playlists, Künstler, Alben, Lieblingssongs, zuletzt gespielt, Favoriten) und Suchen. Schmale Kacheln zeigen die Bereiche als Reiter unten, breite als Seitenleiste. Der Mini-Player öffnet „Läuft gerade“ mit Steuerung, Lautstärke, Geräteauswahl und Warteschlange. Über „⋯“ lassen sich Titel, Alben und Playlists in die Warteschlange stellen, zu Playlists oder zur Mediathek hinzufügen, Playlists anlegen, umbenennen, Titel daraus entfernen und löschen, Künstlern folgen und Favoriten für die Kachel anlegen. Skripte und Ablaufpläne steuern die Wiedergabe über Variablen und `SPM_*`-Funktionen, auch ohne offene Kachel.
+
+![Musikplayer für Spotify — Entdecken](https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Entdecken.png)
+
+![Musikplayer für Spotify — Album](https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Album.png)
+
+<p><img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Schmal.png" alt="Musikplayer für Spotify — Schmale Kachel" width="49%"> <img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Menue.png" alt="Musikplayer für Spotify — Menü" width="49%"></p>
+
+<p><img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Kompakt.png" alt="Musikplayer für Spotify — Kleine Kachel" width="60%"></p>
 
 ## Voraussetzungen
 
@@ -12,6 +22,8 @@ Spielt Spotify direkt in der Symcon-Kachelvisualisierung und steuert jedes Spoti
 - **Browser (Mac, Windows, Android):** Die Kachel ist selbst ein Spotify-Connect-Gerät (Name aus der Instanz, Vorgabe „Symcon“). Es spielt nur über eine sichere Adresse (https, also die Connect-Adresse, oder `localhost`), nicht über `http://<IP>`. Der Player läuft im Fenster der Visualisierung weiter, auch wenn du die Kategorie wechselst.
 - **iPhone und iPad (Safari und Symcon-App):** Spotify bietet dort keinen Web-Player. Die Kachel zeigt und steuert das Gerät, auf dem Spotify gerade spielt (Handy, Sonos, Echo, Fernseher …), und wechselt es über die Geräteauswahl.
 - **Skripte und Variablen** steuern immer das aktive Gerät; ohne aktives Gerät die Kachel im Browser oder das erste bekannte Gerät. `SPM_TransferPlayback` holt die Wiedergabe auf ein bestimmtes Gerät.
+
+<p><img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Laeuft%20gerade.png" alt="Musikplayer für Spotify — Läuft gerade" width="32%"> <img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Geraete.png" alt="Musikplayer für Spotify — Geräteauswahl" width="32%"> <img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Warteschlange.png" alt="Musikplayer für Spotify — Warteschlange" width="32%"></p>
 
 ## Einrichtung
 
