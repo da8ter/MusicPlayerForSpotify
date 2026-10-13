@@ -58,8 +58,8 @@
       let any = ui.section(T('New releases'), releases.albums && releases.albums.items, 'shelf');
       // Je Künstler die drei jüngsten Alben oder Singles, alle zusammen nach Erscheinungsdatum
       const seen = {};
-      const artists = followed(following).concat(top.items || []).filter(a => a && a.id && !seen[a.id] && (seen[a.id] = true)).slice(0, 20);
-      const lists = await Promise.all(artists.map(a => AMP.api('/v1/artists/' + encodeURIComponent(a.id) + '/albums', { include_groups: 'album,single', limit: 3, market: 'from_token' }).catch(none)));
+      const artists = followed(following).concat(top.items || []).filter(a => a && a.id && !seen[a.id] && (seen[a.id] = true)).slice(0, 12);
+      const lists = await inBatches(artists, 4, a => AMP.api('/v1/artists/' + encodeURIComponent(a.id) + '/albums', { include_groups: 'album,single', limit: 3, market: 'from_token' }).catch(none));
       if (!current()) return;
       const ids = {};
       const latest = lists.flatMap(l => l.items || []).filter(a => a && a.id && !ids[a.id] && (ids[a.id] = true))
@@ -78,14 +78,24 @@
   // einzeln abgefragt liefert Spotify sie vollständig. Nur die Platzhalter nachladen; was danach noch
   // keinen Namen hat, ist ein leerer Mix (keine Titel) und entfällt.
   const hasArt = p => (p.images || []).some(i => i && i.url);
+  // Abrufe in kleinen Reihen statt alle auf einmal: Spotify zählt die ganze App im 30-s-Fenster
+  async function inBatches(list, size, fn) {
+    const out = [];
+    for (let i = 0; i < list.length; i += size) out.push(...await Promise.all(list.slice(i, i + size).map(fn)));
+    return out;
+  }
+  // Höchstens 12 Platzhalter nachladen; die übrigen entfallen wie leere Mixe
+  const MAX_COMPLETE = 12;
   async function completePlaylists(list) {
-    return (await Promise.all(list.map(async p => {
+    let budget = MAX_COMPLETE;
+    const todo = list.map(p => (p.name && hasArt(p)) || budget-- > 0 ? p : null).filter(Boolean);
+    return (await inBatches(todo, 4, async p => {
       if (p.name && hasArt(p)) return p;
       try {
         const full = await AMP.api('/v1/playlists/' + encodeURIComponent(p.id), { fields: 'id,uri,type,name,description,images,owner(id,display_name)' });
         return Object.assign({}, p, full);
       } catch (e) { return p; }
-    }))).filter(p => p.name);
+    })).filter(p => p.name);
   }
   function discover() {
     ui.page(T('Discover'));
