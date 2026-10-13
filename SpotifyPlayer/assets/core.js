@@ -1,6 +1,6 @@
 /* Musikplayer für Spotify – Kern: Web Playback SDK laden, Befehle ausführen, Zustand melden
-   (Token, Web API und Zwischenspeicher in webapi.js). Im Browser läuft der SDK-Player einmal im Visu-Hauptfenster (gleicher Ursprung),
-   damit die Musik einen Kategoriewechsel übersteht; die Kachel ist dann nur Bedienoberfläche.
+   (Token, Web API und Zwischenspeicher in webapi.js). Im Browser läuft der SDK-Player einmal im
+   Visu-Hauptfenster (gleicher Ursprung), damit die Musik einen Kategoriewechsel übersteht.
    Spielt ein anderes Spotify-Connect-Gerät, zeigt die Kachel dessen Zustand (Abfrage alle 10 s)
    und steuert es über die Web API. Das SDK läuft auch in der Symcon-App auf iOS (gemessen 13.10.2026);
    offiziell unterstützt Spotify mobile Browser nicht. Ohne SDK bleibt nur die Fernsteuerung. */
@@ -193,7 +193,7 @@
         playing: !!remote.is_playing, position: remote.progress_ms || 0, duration: it ? it.duration_ms || 0 : 0, at: remoteAt,
         item: it ? { id: it.id, uri: it.uri, name: it.name, artist: (it.artists || []).map(a => a.name).join(', '), album: it.album ? it.album.name : (it.show ? it.show.name : ''), albumId: it.album ? it.album.id : '', images: it.album ? it.album.images : it.images, type: it.type } : null,
         shuffle: !!remote.shuffle_state, repeat: REPEAT_FROM_API[remote.repeat_state] || 0, volume: typeof d.volume_percent === 'number' ? d.volume_percent : null,
-        context: remote.context && remote.context.uri, deviceId: d.id, deviceName: d.name, deviceType: d.type, local: d.id === s.deviceId,
+        context: remote.context && remote.context.uri, deviceId: d.id, deviceName: d.name, deviceType: d.type, local: d.id === ownDeviceId(),
       };
     }
     return { playing: false, position: 0, duration: 0, at: Date.now(), item: null, shuffle: false, repeat: 0, volume: null, context: '', deviceId: '', deviceName: '', deviceType: '', local: false };
@@ -261,7 +261,7 @@
   // ── Befehle ──
   function deviceParam() {
     const current = state();
-    const id = current.deviceId || slot().deviceId;
+    const id = current.deviceId || ownDeviceId();
     return id ? { device_id: id } : {};
   }
   async function perform(command, args) {
@@ -431,25 +431,61 @@
     return (best && best.url) || '';
   }
 
+  // ── Player in der Kachel (iOS-App: Hauptfenster nicht erreichbar) ──
+  // Jede Kachelansicht (auch die vergrößerte, andere Seiten mit derselben Kachel) würde ein eigenes
+  // Spotify-Gerät anmelden. Eine Sperre je Instanz lässt nur eine Ansicht den Player bauen; die anderen
+  // steuern ihn fern und übernehmen, sobald die besitzende Ansicht verschwindet.
+  const TILE_LOCK = SLOT + '_tilePlayer';
+  const sharedDevice = () => { try { return localStorage.getItem(TILE_LOCK) || ''; } catch (e) { return ''; } };
+  const ownDeviceId = () => slot().deviceId || (!player ? sharedDevice() : '');
+  function shareDeviceId() {
+    const id = slot().deviceId;
+    if (!id) { setTimeout(shareDeviceId, 500); return; }
+    try { localStorage.setItem(TILE_LOCK, id); } catch (e) { /* egal */ }
+  }
+  async function adoptPlayer(p) {
+    player = p;
+    bindPlayer();
+    try { local = await player.getCurrentState(); } catch (e) { local = null; }
+    if (slot().accountError) premiumMissing = true;
+  }
+  // Liefert den Player, wenn diese Ansicht die Sperre bekommt, sonst null (und wartet im Hintergrund darauf)
+  function tilePlayer() {
+    if (!navigator.locks) return loadPlayer().catch(() => null);
+    const hold = () => new Promise(() => {}); // Sperre halten, solange die Ansicht lebt
+    return new Promise(resolve => {
+      navigator.locks.request(TILE_LOCK, { ifAvailable: true }, lock => {
+        if (!lock) {
+          resolve(null);
+          navigator.locks.request(TILE_LOCK, () => loadPlayer().then(async p => {
+            await adoptPlayer(p);
+            shareDeviceId();
+            emit('state');
+            return hold();
+          }, () => null));
+          return null;
+        }
+        return loadPlayer().then(p => { resolve(p); shareDeviceId(); return hold(); }, () => { resolve(null); return null; });
+      });
+    });
+  }
+
   async function start() {
     if (cfg.mode !== 'player') { emit('ready'); return; }
     slot().token = web.token();
-    // SDK-Player: im Hauptfenster, sonst in der Kachel; ohne SDK nur Fernsteuerung
-    try {
-      player = await loadPlayer();
-    } catch (e) {
-      debug('sdk ' + (host ? 'host' : 'tile') + ': ' + errText(e));
-      if (host) {
+    // SDK-Player: im Hauptfenster, sonst in der Kachel (eine Ansicht je Gerät); ohne SDK nur Fernsteuerung
+    let p = null;
+    if (host) {
+      try {
+        p = await loadPlayer();
+      } catch (e) {
+        debug('sdk host: ' + errText(e));
         host = null;
         win = window;
-        try { player = await loadPlayer(); } catch (e2) { player = null; }
       }
     }
-    if (player) {
-      bindPlayer();
-      try { local = await player.getCurrentState(); } catch (e) { local = null; }
-      if (slot().accountError) premiumMissing = true;
-    }
+    if (!host) p = await tilePlayer();
+    if (p) await adoptPlayer(p);
     // Chrome & Co. geben den Kopierschutz (Widevine) nur auf sicheren Seiten frei (https, localhost)
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
@@ -470,7 +506,7 @@
     onChange: fn => listeners.push(fn),
     notify: text => emit('notice', text),
     hasPlayer: () => !!player && !premiumMissing,
-    sdkDevice: () => slot().deviceId,
+    sdkDevice: ownDeviceId,
     premiumMissing: () => premiumMissing,
     // Ist dieser Eintrag der zuletzt gestartete Kontext bzw. der laufende Titel?
     isCurrent: play => {
