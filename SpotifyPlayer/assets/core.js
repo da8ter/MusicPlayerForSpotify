@@ -124,6 +124,12 @@
           s.pending = null;
           s.player = p;
           s.state = 'ready';
+          // Verlässt das Player-Fenster die Seite (Neuladen, App geschlossen), das Gerät bei Spotify abmelden;
+          // sonst bleibt es dort stehen und jedes Neuladen fügt ein weiteres „Symcon · …“ hinzu
+          if (!s.unloadBound) {
+            s.unloadBound = true;
+            win.addEventListener('pagehide', new win.Function('var s = window["' + SLOT + '"]; if (s && s.player) { try { s.player.disconnect(); } catch (e) {} }'));
+          }
         } catch (e) { if (!superseded()) { s.state = 'error'; s.error = errText(e); } }
         continue;
       }
