@@ -464,7 +464,7 @@
     if (msg.type === 'auth') {
       // Schon abgemeldet geladen: nichts zu tun (sonst lädt jede Abmeldung alle Kacheln endlos neu).
       if (msg.signedIn === false && cfg.mode !== 'player') return;
-      if (msg.signedIn === false && player) { try { player.disconnect(); } catch (e) { /* egal */ } }
+      resetSlot(msg.signedIn === false);
       location.reload();
       return;
     }
@@ -500,8 +500,25 @@
     setTimeout(() => { if (loginWindow && !loginWindow.closed && loginWindow.location.href === 'about:blank') { loginWindow.close(); loginWindow = null; emit('error', T('Spotify could not be loaded')); } }, 10000);
   }
   function logout() {
-    if (player) { try { player.disconnect(); } catch (e) { /* egal */ } }
+    resetSlot(true);
     action('Logout', '');
+  }
+  // Konto gewechselt oder abgemeldet: nichts vom alten Konto im Hauptfenster stehen lassen (Zwischenspeicher,
+  // gestarteter Kontext, abgefragter Zustand); abgemeldet auch den Player trennen, damit eine neue Anmeldung
+  // einen frischen verbindet statt den getrennten weiterzureichen.
+  function resetSlot(signedOut) {
+    const s = slot();
+    s.cache = new win.Object();
+    s.context = '';
+    s.remoteJson = '';
+    s.remoteAt = 0;
+    if (!signedOut) return;
+    const p = s.player || player;
+    if (p) { try { p.disconnect(); } catch (e) { /* egal */ } }
+    s.player = null;
+    s.deviceId = '';
+    s.accountError = false;
+    s.state = 'new'; // inject() erkennt ein schon geladenes SDK
   }
 
   // Bild passender Größe aus Spotifys images-Liste (absteigend sortiert)
