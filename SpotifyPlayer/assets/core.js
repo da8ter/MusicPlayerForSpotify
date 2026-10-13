@@ -325,6 +325,7 @@
   let polling = false;
   let pollAgain = false;
   let commandAt = 0;
+  let pollOkAt = 0;
   async function poll() {
     if (document.visibilityState === 'hidden' || !token) return;
     // Läuft schon eine Abfrage, nach ihr noch einmal fragen (sonst fällt der Nachlauf nach einem Befehl aus)
@@ -347,6 +348,7 @@
       }
       // Spielt ein anderes Gerät, ist der SDK-Zustand veraltet
       if (remote && remote.device.id !== slot().deviceId) local = null;
+      pollOkAt = Date.now();
       emit('state');
       report(false);
     } catch (e) { /* nächster Versuch */ } finally {
@@ -572,9 +574,10 @@
     schedulePoll(nextPoll());
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') schedulePoll(0); });
     report(true);
-    // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar
-    // (Abfrage läuft) oder mit spielendem SDK-Player (Ereignisse)
-    setInterval(() => { if (document.visibilityState === 'visible' || local) report(true); }, 30000);
+    // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar mit
+    // gelungener eigener Abfrage oder mit spielendem SDK-Player (Ereignisse). Schlagen die Abfragen fehl
+    // (429, gesperrt), schweigt die Kachel, und das Modul fragt wieder selbst.
+    setInterval(() => { if ((document.visibilityState === 'visible' && Date.now() - pollOkAt < 75000) || local) report(true); }, 30000);
   }
 
   window.AMP = {
