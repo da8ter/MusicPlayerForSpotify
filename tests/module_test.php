@@ -169,8 +169,13 @@ preg_match('#window\.SPM_CONFIG = (.*?);</script>#s', $html, $m);
 $config = json_decode($m[1], true);
 check($config['instance'] === 12345 && $config['mode'] === 'player' && $config['accessToken'] === 'ACCESS3xxxxxxxxxxxxxxxxxxxx' && $config['userId'] === 'stephan' && $config['premium'] === true && count($config['favorites']) === 2, 'Kachel: angemeldet mit Token, Profil und Favoriten');
 // ── Übernehmen: nur bei Änderungen am Anmeldestand neu laden, geänderte Favoriten als Nachricht ──
+// Die Anmeldung hat die Kacheln schon per auth-Push neu geladen und sich den Stand gemerkt
+$before = count($module->updates);
 IPS_ApplyChanges(12345);
-check(end($module->updates) === ['type' => 'reload'], 'Übernehmen nach der Anmeldung lädt neu (Anmeldestand ist Teil der Kachel)');
+check(count($module->updates) === $before, 'Übernehmen nach der Anmeldung lädt nicht noch einmal neu');
+IPS_SetProperty(12345, 'PlayerName', 'Wohnzimmer');
+IPS_ApplyChanges(12345);
+check(end($module->updates) === ['type' => 'reload'], 'Geänderter Gerätename lädt die Kacheln neu');
 $before = count($module->updates);
 IPS_ApplyChanges(12345);
 check(count($module->updates) === $before, 'Unverändertes Übernehmen schickt nichts');
@@ -193,8 +198,9 @@ check($module->Request('GET', 'https://evil', '') === '' && $module->Request('PA
 $module->Logout();
 check($module->status === 202 && end($module->updates) === ['type' => 'auth', 'signedIn' => false] && $module->timers['Poll'] === 0, 'Abmelden: Status, Signal und Timer');
 check($module->values['Title'] === '' && $module->values['Device'] === '' && $module->values['Playback'] === 1 && $module->buffers['TileDevice'] === '', 'Abmelden: Spotify-Daten aus Variablen und Puffern gelöscht');
+$before = count($module->updates);
 IPS_ApplyChanges(12345);
-check(end($module->updates) === ['type' => 'reload'], 'Übernehmen nach Abmeldung lädt neu');
+check(count($module->updates) === $before, 'Übernehmen nach Abmeldung lädt nicht noch einmal neu (auth-Push hat das erledigt)');
 $config = json_decode((static function (string $html): string { preg_match('#window\.SPM_CONFIG = (.*?);</script>#s', $html, $m); return $m[1]; })($module->GetVisualizationTile()), true);
 check($config['mode'] === 'login' && $config['accessToken'] === '' && !isset($config['authUrl']), 'Kachel ohne Anmeldung: kein Token, keine Anmeldeadresse im Seitenaufbau');
 $module->RequestAction('Login', str_repeat('ab', 12));

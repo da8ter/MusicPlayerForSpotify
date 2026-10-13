@@ -63,6 +63,7 @@ trait MusicPlayerSpotifyAuthTrait
             return $this->Translate('Sign-in failed') . ': ' . $e->getMessage();
         }
         $this->ApplySignedIn();
+        $this->RememberTileHash();
         $this->PushToTiles(['type' => 'auth', 'signedIn' => true]);
         return '';
     }
@@ -92,6 +93,7 @@ trait MusicPlayerSpotifyAuthTrait
                 $this->ClearTokens();
                 $this->ClearState();
                 $this->SetStatus(self::STATUS_SIGNED_OUT);
+                $this->RememberTileHash();
                 $this->PushToTiles(['type' => 'auth', 'signedIn' => false]);
             } else {
                 $this->SetTimerInterval('RefreshToken', 60 * 1000);
@@ -113,6 +115,7 @@ trait MusicPlayerSpotifyAuthTrait
         $this->SetTimerInterval('RefreshToken', 0);
         $this->SetTimerInterval('Poll', 0);
         $this->SetStatus(self::STATUS_SIGNED_OUT);
+        $this->RememberTileHash();
         $this->PushToTiles(['type' => 'auth', 'signedIn' => false]);
     }
 

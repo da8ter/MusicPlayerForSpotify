@@ -88,10 +88,9 @@ class MusicPlayerForSpotify extends IPSModuleStrict
 
         // Kacheln nur neu laden, wenn sich etwas für sie geändert hat; geänderte Favoriten gehen als
         // Nachricht hinaus (ein Favorit aus der Kachel soll nicht alle Geräte neu laden).
-        $tileHash = hash('sha256', json_encode([$this->ConnectURL() !== '', $this->ReadPropertyString('PlayerName'), $this->SignedIn()]));
+        [$tileHash, $favoritesHash] = $this->TileHashes();
         $previous = $this->ReadAttributeString('TileHash');
         $favorites = $this->Favorites();
-        $favoritesHash = hash('sha256', json_encode($favorites));
         $this->WriteAttributeString('TileHash', $tileHash . '|' . $favoritesHash);
         if ($previous === '' || !str_starts_with($previous, $tileHash . '|')) {
             $this->PushToTiles(['type' => 'reload']);
@@ -410,6 +409,24 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     }
 
     /** Zustand aus der Kachel (SDK-Gerät oder abgefragtes Connect-Gerät) in die Variablen. */
+    /**
+     * Was die Kacheln beim Laden fest einbauen (Connect, Gerätename, angemeldet) und die Favoriten, je als Hash.
+     * @return array{0: string, 1: string}
+     */
+    private function TileHashes(): array
+    {
+        return [
+            hash('sha256', json_encode([$this->ConnectURL() !== '', $this->ReadPropertyString('PlayerName'), $this->SignedIn()])),
+            hash('sha256', json_encode($this->Favorites())),
+        ];
+    }
+
+    /** An- und Abmelden laden die Kacheln selbst neu (Push auth): den Stand merken, sonst lädt das nächste ApplyChanges sie noch einmal. */
+    private function RememberTileHash(): void
+    {
+        $this->WriteAttributeString('TileHash', implode('|', $this->TileHashes()));
+    }
+
     private function HandleState(string $Json): void
     {
         $state = json_decode($Json, true);
