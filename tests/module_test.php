@@ -169,7 +169,7 @@ check(array_column(json_decode($module->variables['Favorite']['presentation']['O
 
 // ── Kachel ──
 $html = $module->GetVisualizationTile();
-check(!preg_match('#/\*(CONFIG|CORE|ICONS|NAV|ACTIONS|UI|DETAILS|VIEWS|PLAYER|SCROLL|STYLE)\*/#', $html) && str_contains($html, 'bindScrollContainment'), 'Kachel: alle Platzhalter ersetzt, Scroll-Eindämmung dabei');
+check(!preg_match('#/\*(CONFIG|WEBAPI|CORE|ICONS|NAV|ACTIONS|UI|DETAILS|VIEWS|PLAYER|SCROLL|STYLE)\*/#', $html) && str_contains($html, 'bindScrollContainment'), 'Kachel: alle Platzhalter ersetzt, Scroll-Eindämmung dabei');
 check(substr_count($html, '</script>') === substr_count($html, '<script'), 'Kachel: Skriptblöcke bleiben geschlossen');
 preg_match('#window\.SPM_CONFIG = (.*?);</script>#s', $html, $m);
 $config = json_decode($m[1], true);

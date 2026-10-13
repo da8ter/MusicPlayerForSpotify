@@ -1,5 +1,5 @@
-/* Musikplayer für Spotify – Kern: Web Playback SDK laden, Web API aufrufen, Befehle ausführen,
-   Zustand melden. Im Browser läuft der SDK-Player einmal im Visu-Hauptfenster (gleicher Ursprung),
+/* Musikplayer für Spotify – Kern: Web Playback SDK laden, Befehle ausführen, Zustand melden
+   (Token, Web API und Zwischenspeicher in webapi.js). Im Browser läuft der SDK-Player einmal im Visu-Hauptfenster (gleicher Ursprung),
    damit die Musik einen Kategoriewechsel übersteht; die Kachel ist dann nur Bedienoberfläche.
    Spielt ein anderes Spotify-Connect-Gerät, zeigt die Kachel dessen Zustand (Abfrage alle 10 s)
    und steuert es über die Web API. Das SDK läuft auch in der Symcon-App auf iOS (gemessen 13.10.2026);
@@ -12,15 +12,12 @@
   // Das SDK-Skript gibt es je Fenster nur einmal, auch für mehrere Instanzen
   const SDK_FLAG = '__symconSpotifySdk';
   const SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
-  const API = 'https://api.spotify.com';
   const ITEM_TYPES = ['track', 'album', 'playlist', 'artist'];
   const listeners = [];
   const bound = [];
   let host = null;
   try { if (window.top !== window && window.top.document.head) host = window.top; } catch (e) { host = null; }
   let win = host || window;
-  let token = cfg.accessToken || '';
-  let expiresAt = cfg.expiresAt || 0;
   let player = null; // SDK-Player (Objekt des Player-Fensters)
   let local = null;  // letzter Zustand des SDK-Players (null: ein anderes Gerät ist aktiv)
   let remote = null; // letzter Zustand von /v1/me/player
@@ -60,124 +57,9 @@
     return s;
   }
 
-  // ── Access-Token: kommt beim Seitenaufbau und per Push (type token); bei 401 anfordern und warten ──
-  let tokenWaiters = [];
-  function setToken(value, exp) {
-    token = value || '';
-    expiresAt = exp || 0;
-    slot().token = token;
-    tokenWaiters.forEach(fn => fn());
-    tokenWaiters = [];
-  }
-  function requestToken() {
-    action('RefreshToken', '');
-    return new Promise(resolve => { tokenWaiters.push(resolve); setTimeout(resolve, 8000); });
-  }
-  async function ensureToken() {
-    if (token && expiresAt * 1000 - Date.now() > 60000) return token;
-    await requestToken();
-    return token;
-  }
-
-  // ── Web API ──
-  // Spotify zählt Abrufe je App (gleitendes 30-s-Fenster); bei HTTP 429 pausieren alle Kacheln des Fensters
-  const RATE_LIMIT_MIN = 30000;
-  function rateLimitError() {
-    const e = new Error('HTTP 429');
-    e.status = 429;
-    return e;
-  }
-  async function call(method, path, query, body) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if ((slot().rateLimitUntil || 0) > Date.now()) throw rateLimitError();
-      const t = await ensureToken();
-      // Kein Token zu bekommen: die Anmeldung ist abgelaufen oder widerrufen (einmal je Seite melden)
-      if (!t) { loginExpired(); const e = new Error(T('Not signed in to Spotify')); e.status = 401; throw e; }
-      const qs = query && Object.keys(query).length ? (path.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString() : '';
-      const url = (path.indexOf('https://') === 0 ? path : API + path) + qs;
-      const headers = { Authorization: 'Bearer ' + t };
-      if (body !== undefined) headers['Content-Type'] = 'application/json';
-      const res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
-      if (res.status === 401 && attempt === 0) { token = ''; await requestToken(); continue; }
-      if (res.status === 429) {
-        // Retry-After gibt Spotify Browsern nicht frei: dann 30 s, bei jedem weiteren 429 doppelt so lange (höchstens 1 h)
-        const s = slot();
-        const retry = (parseInt(res.headers.get('Retry-After'), 10) || 0) * 1000;
-        const wait = retry > 0 ? Math.max(RATE_LIMIT_MIN, retry) : Math.min(3600000, Math.max(RATE_LIMIT_MIN, (s.rateLimitStep || 0) * 2));
-        s.rateLimitStep = retry > 0 ? 0 : wait;
-        s.rateLimitUntil = Date.now() + wait;
-        debug('api ' + method + ' ' + path + ' -> 429, pause ' + Math.round(wait / 1000) + ' s');
-        throw rateLimitError();
-      }
-      slot().rateLimitStep = 0;
-      if (res.status === 204 || res.status === 202) return {};
-      const text = await res.text();
-      let data = {};
-      try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
-      if (!res.ok) {
-        debug('api ' + method + ' ' + path + ' -> ' + res.status + ' ' + ((data.error && (data.error.reason || data.error.message)) || ''));
-        const err = new Error((data.error && (data.error.reason || data.error.message)) || ('HTTP ' + res.status));
-        err.status = res.status;
-        err.reason = data.error && data.error.reason;
-        if (res.status === 401) loginExpired();
-        throw err;
-      }
-      return data;
-    }
-    const e = new Error(T('Not signed in to Spotify'));
-    e.status = 401;
-    throw e;
-  }
-
-  // Lesende Abfragen 5 Minuten vorhalten. Der Speicher hängt am Slot des Player-Fensters und
-  // übersteht im Browser damit auch das Neuladen der Kachel nach einem Kategoriewechsel.
-  const CACHE_TTL = 5 * 60 * 1000;
-  function cache() {
-    const s = slot();
-    if (!s.cache) s.cache = new win.Object();
-    return s.cache;
-  }
-  function clearCache(prefix) {
-    const c = cache();
-    // Folgeseiten liegen unter Spotifys absoluter next-Adresse: für den Vergleich ohne API-Präfix
-    Object.keys(c).forEach(key => {
-      const path = key.indexOf(API) === 0 ? key.slice(API.length) : key;
-      if (!prefix || path.indexOf(prefix) === 0) delete c[key];
-    });
-  }
-  async function api(path, params) {
-    const key = path + '?' + JSON.stringify(params || {});
-    const hit = cache()[key];
-    if (hit && Date.now() - hit.time < CACHE_TTL) return hit.data;
-    const data = await call('GET', path, params);
-    const entry = new win.Object();
-    entry.time = Date.now();
-    entry.data = data;
-    cache()[key] = entry;
-    return data;
-  }
-  // Alle Seiten einer Liste (items + next), bis max Einträge; /me/following liefert sie unter artists
-  async function apiAll(path, params, max) {
-    const limit = max || 1000;
-    const all = [];
-    let data = await api(path, params || {});
-    for (;;) {
-      const box = data.artists || data;
-      const page = box.items || [];
-      all.push(...page);
-      if (!box.next || !page.length || all.length >= limit) break;
-      data = await api(box.next);
-    }
-    return all.slice(0, limit);
-  }
-
-  // Nur eine bestehende Anmeldung kann ablaufen, und nur einmal je Seite melden.
-  let expiredSent = false;
-  function loginExpired() {
-    if (expiredSent || cfg.mode !== 'player' || token) return;
-    expiredSent = true;
-    emit('error', T('Sign-in expired. Please sign in again.'));
-  }
+  // Access-Token, Web API und Zwischenspeicher: webapi.js
+  const web = window.AMPWebApi({ cfg, T, slot, win: () => win, action, debug, emit });
+  const { call, api, apiAll, clearCache, requestToken, setToken } = web;
 
   // ── SDK-Player im Player-Fenster ──
   function on(target, name, fn) {
@@ -208,7 +90,7 @@
 
   async function loadPlayer() {
     const s = slot();
-    s.token = token;
+    s.token = web.token();
     if (s.state === 'error') s.state = 'new';
     if (s.state === 'new') inject(s);
     for (let i = 0; i < 300; i++) {
@@ -258,7 +140,7 @@
       emit('state');
       report(false);
     });
-    on(player, 'authentication_error', () => { token = ''; requestToken(); });
+    on(player, 'authentication_error', () => { web.dropToken(); requestToken(); });
     on(player, 'account_error', () => { premiumMissing = true; emit('notice', T('Spotify Premium is required for playback')); });
     on(player, 'playback_error', e => emit('error', T('Playback failed') + ' (' + errText(e) + ')'));
     on(player, 'initialization_error', e => emit('error', T('Spotify could not be loaded') + ' (' + errText(e) + ')'));
@@ -327,7 +209,7 @@
   let commandAt = 0;
   let pollOkAt = 0;
   async function poll() {
-    if (document.visibilityState === 'hidden' || !token) return;
+    if (document.visibilityState === 'hidden' || !web.token()) return;
     // Läuft schon eine Abfrage, nach ihr noch einmal fragen (sonst fällt der Nachlauf nach einem Befehl aus)
     if (polling) { pollAgain = true; return; }
     polling = true;
@@ -551,7 +433,7 @@
 
   async function start() {
     if (cfg.mode !== 'player') { emit('ready'); return; }
-    slot().token = token;
+    slot().token = web.token();
     // SDK-Player: im Hauptfenster, sonst in der Kachel; ohne SDK nur Fernsteuerung
     try {
       player = await loadPlayer();

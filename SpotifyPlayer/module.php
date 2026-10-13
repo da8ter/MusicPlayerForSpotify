@@ -186,6 +186,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         return strtr((string) file_get_contents(__DIR__ . '/module.html'), [
             '/*STYLE*/'      => file_get_contents(__DIR__ . '/assets/player.css') . "\n" . file_get_contents(__DIR__ . '/assets/layout.css'),
             '/*CONFIG*/null' => json_encode($config, $flags),
+            '/*WEBAPI*/'     => (string) file_get_contents(__DIR__ . '/assets/webapi.js'),
             '/*CORE*/'       => (string) file_get_contents(__DIR__ . '/assets/core.js'),
             '/*ICONS*/'      => (string) file_get_contents(__DIR__ . '/assets/icons.js'),
             '/*NAV*/'        => (string) file_get_contents(__DIR__ . '/assets/nav.js'),

@@ -8,6 +8,7 @@ Betriebsdaten dieses Rechners (Testinstanz, Client-ID) stehen in `CLAUDE.local.m
 
 - **`SpotifyPlayer/`**: einziges Modul „Music Player For Spotify“, Klasse `MusicPlayerForSpotify`, Anzeigename über locale.json „Musikplayer für Spotify“, Präfix `SPM`, `IPSModuleStrict`.
 - **Kachel:** `module.html` ist ein Gerüst; `GetVisualizationTile` setzt `assets/player.css` + `layout.css`, die Skripte und die Startdaten (`SPM_CONFIG`) per `strtr` ein. Aufbau wie die Musik-Apps: Start, Neu, Entdecken, Mediathek, Suchen; unter 720 px Reiter unten mit Mini-Player, darüber Seitenleiste (`html.wide`); sehr kleine Kacheln nur Cover und Steuerung (`html.compact`). `AMP.start()` steht als letztes Skript. Die JS-Namen `AMP*` sind vom Apple-Modul geerbt und bewusst gleich geblieben (gemeinsamer Code).
+  - `webapi.js`: Access-Token (Push `token`, bei 401 nachfordern), Web API mit 429-Pause im Slot, Zwischenspeicher (5 min, nur JSON-Text, höchstens 150 Einträge) – `window.AMPWebApi(ctx)`, von `core.js` erzeugt.
   - `core.js`: SDK-Player laden (im Browser im Visu-Hauptfenster, sonst in der Kachel; läuft auch in der Symcon-iOS-App, am 13.10.2026 gemessen: Gerät „Symcon“ aktiv und spielend; dort im Kachelfenster, weil das Hauptfenster nicht erreichbar ist, also ein Player je Kachelansicht (zwischenzeitlich zwei „Symcon · iPhone“, nach Neuladen nicht mehr aufgetreten); Ausweichen in die Kachel meldet das Debug mit Grund; Safari auf iOS ungeprüft), Web API mit Token-Nachforderung bei 401, Zustand (SDK oder abgefragtes Connect-Gerät, Abfrage alle 10 s bei sichtbarer Kachel, solange ein Connect-Gerät spielt, und kurz nach dem erwarteten Titelende, sonst 30 s; ein Befehl während einer laufenden Abfrage verwirft deren Antwort und fragt gleich neu), Befehle, Meldung an Symcon.
   - `icons.js`: Font Awesome Light aus `/icons.js` der Visu, Spotify-Logo aus den Brands (`fab`).
   - `nav.js`, `scroll.js`, `player.css`, `layout.css`: wie im Apple-Modul.
@@ -27,6 +28,7 @@ Betriebsdaten dieses Rechners (Testinstanz, Client-ID) stehen in `CLAUDE.local.m
 php -l SpotifyPlayer/module.php; for f in libs/*.php; do php -l "$f"; done
 for f in SpotifyPlayer/assets/*.js; do node --check "$f"; done
 php tests/module_test.php
+node tests/webapi_test.js
 git diff --check
 ```
 
