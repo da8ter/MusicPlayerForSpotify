@@ -322,9 +322,14 @@
   // das Hauptfenster keine Objekte einer verworfenen Kachel hält).
   const SHARED_POLL = 8000;
   let polling = false;
+  let pollAgain = false;
+  let commandAt = 0;
   async function poll() {
-    if (polling || document.visibilityState === 'hidden' || !token) return;
+    if (document.visibilityState === 'hidden' || !token) return;
+    // Läuft schon eine Abfrage, nach ihr noch einmal fragen (sonst fällt der Nachlauf nach einem Befehl aus)
+    if (polling) { pollAgain = true; return; }
     polling = true;
+    const startedAt = Date.now();
     try {
       const s = slot();
       if (s.remoteAt && Date.now() - s.remoteAt < SHARED_POLL) {
@@ -332,6 +337,8 @@
         remoteAt = s.remoteAt;
       } else {
         const data = await call('GET', '/v1/me/player', { additional_types: 'track,episode' });
+        // Kam während der Abfrage ein Befehl, ist die Antwort schon alt: verwerfen und gleich neu fragen
+        if (commandAt > startedAt) { pollAgain = true; return; }
         remote = data && data.device ? data : null;
         remoteAt = Date.now();
         s.remoteJson = JSON.stringify(remote);
@@ -341,11 +348,14 @@
       if (remote && remote.device.id !== slot().deviceId) local = null;
       emit('state');
       report(false);
-    } catch (e) { /* nächster Versuch */ }
-    polling = false;
+    } catch (e) { /* nächster Versuch */ } finally {
+      polling = false;
+    }
   }
   let pollTimer = 0;
   function nextPoll() {
+    // Nachlauf nach einem Befehl, der während einer laufenden Abfrage kam (poll setzt pollAgain)
+    if (pollAgain) { pollAgain = false; return 300; }
     const every = local ? 30000 : 10000;
     if (local || !remote || !remote.is_playing || !remote.item) return every;
     const left = (remote.item.duration_ms || 0) - (remote.progress_ms || 0) - (Date.now() - remoteAt);
@@ -421,6 +431,7 @@
     return Promise.resolve().then(() => perform(command, args || {})).then(() => {
       // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt
       slot().remoteAt = 0;
+      commandAt = Date.now();
       schedulePoll(command === 'volume' ? 1500 : 600);
       return true;
     }, e => {
