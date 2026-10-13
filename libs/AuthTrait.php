@@ -57,6 +57,8 @@ trait MusicPlayerSpotifyAuthTrait
             $this->WriteAttributeString('UserName', mb_substr((string) ($me['display_name'] ?? ''), 0, 100));
             $this->WriteAttributeString('Product', (string) ($me['product'] ?? ''));
         } catch (\Throwable $e) {
+            // Ohne Profil keine halbe Anmeldung (Tokens gespeichert, aber Status, Timer und UserID fehlen)
+            $this->ClearTokens();
             $this->LogMessage($this->Translate('Sign-in failed') . ': ' . $e->getMessage(), KL_WARNING);
             return $this->Translate('Sign-in failed') . ': ' . $e->getMessage();
         }
