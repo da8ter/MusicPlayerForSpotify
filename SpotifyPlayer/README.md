@@ -72,12 +72,6 @@ SPM_Logout(int $InstanzID): void;
 
 Alle Funktionen geben `false` zurück und schreiben ins Log, wenn kein Gerät erreichbar ist oder Spotify den Befehl ablehnt.
 
-## Grenzen
-
-- Spotify stellt neue Titel nur hinten an die Warteschlange; „Als Nächstes“ gibt es in der Web API nicht. Die Warteschlange lässt sich anzeigen, aber nicht umsortieren.
-- Empfehlungen und ähnliche Künstler gibt es nicht mehr, Spotify hat diese Schnittstellen im November 2024 abgeschaltet.
-- **Zusammen mit Symcons Spotify-Modul:** Beide nutzen beim OAuth-Dienst dieselbe Kennung, und der Rückruf der Anmeldung geht an genau eine Instanz. Dieses Modul übernimmt sie beim Klick auf *Anmelden*, Symcons Modul beim Übernehmen seiner Instanz. Vor einer Anmeldung in Symcons Modul daher dort einmal *Übernehmen*. Bestehende Anmeldungen beider Module betrifft das nicht. Dasselbe gilt für mehrere Instanzen dieses Moduls: angemeldet wird jeweils die Instanz, deren Kachel die Anmeldung gestartet hat.
-- Das Access-Token ist in der Kachel sichtbar. Wer die Visualisierung öffnen darf, kann damit das Spotify-Konto bedienen, so wie über die Kachel selbst.
 
 ## Nutzungsbedingungen und Datenschutz
 
