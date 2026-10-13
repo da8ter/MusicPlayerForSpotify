@@ -414,8 +414,9 @@
   }
 
   // ── Zustand an Symcon melden (Ereignisse 300 ms gesammelt) ──
+  // Nur, was Spotify wirklich meldet: „zuletzt gespielt“ ist Anzeige, kein Wiedergabezustand für die Variablen
   function snapshot() {
-    const c = state();
+    const c = liveState();
     const images = c.item && c.item.images;
     return {
       playing: c.playing, title: c.item ? c.item.name || '' : '', artist: c.item ? c.item.artist || '' : '', album: c.item ? c.item.album || '' : '',
