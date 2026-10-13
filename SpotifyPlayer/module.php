@@ -409,7 +409,6 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->SetTimerInterval('ApplyFavorites', 200);
     }
 
-    /** Zustand aus der Kachel (SDK-Gerät oder abgefragtes Connect-Gerät) in die Variablen. */
     /**
      * Was die Kacheln beim Laden fest einbauen (Connect, Gerätename, angemeldet) und die Favoriten, je als Hash.
      * @return array{0: string, 1: string}
@@ -428,6 +427,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->WriteAttributeString('TileHash', implode('|', $this->TileHashes()));
     }
 
+    /** Zustand aus der Kachel (SDK-Gerät oder abgefragtes Connect-Gerät) in die Variablen. */
     private function HandleState(string $Json): void
     {
         $state = json_decode($Json, true);
