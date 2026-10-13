@@ -234,6 +234,8 @@ trait MusicPlayerSpotifyApiTrait
         $wanted = $this->GetBuffer('WantedDevice');
         $devices = $this->Api('GET', '/v1/me/player/devices')['devices'] ?? [];
         $devices = is_array($devices) ? array_filter($devices, static fn ($d): bool => is_array($d) && is_string($d['id'] ?? null) && ($d['is_restricted'] ?? false) !== true) : [];
+        // array_values: array_filter behält die Schlüssel, sonst fehlt $ids[0], wenn das erste Gerät herausfällt
+        $devices = array_values($devices);
         $ids = array_map(static fn (array $d): string => $d['id'], $devices);
         if ($wanted !== '' && in_array($wanted, $ids, true)) {
             return $wanted;
