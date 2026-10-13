@@ -214,6 +214,7 @@
         try {
           const options = new win.Object();
           options.name = window.AMPPlayer ? await window.AMPPlayer.deviceName() : (cfg.playerName || 'Symcon');
+          s.deviceName = options.name;
           options.volume = 0.5;
           // Token-Rückruf und Geräte-ID gehören dem Player-Fenster: das SDK hält keine Kachel fest
           options.getOAuthToken = new win.Function('cb', 'cb(window["' + SLOT + '"].token);');
@@ -283,7 +284,7 @@
         playing: !local.paused, position: local.position || 0, duration: local.duration || 0, at: Date.now(),
         item: { id: t.id, uri: t.uri, name: t.name, artist: (t.artists || []).map(a => a.name).join(', '), album: t.album && t.album.name, albumId: t.album && t.album.uri ? String(t.album.uri).split(':').pop() : '', images: t.album && t.album.images, type: t.type || 'track' },
         shuffle: !!local.shuffle, repeat: local.repeat_mode || 0, volume: localVolume,
-        context: local.context && local.context.uri, deviceId: s.deviceId, deviceName: cfg.playerName, deviceType: 'tile', local: true,
+        context: local.context && local.context.uri, deviceId: s.deviceId, deviceName: s.deviceName || cfg.playerName, deviceType: 'tile', local: true,
       };
     }
     if (remote && remote.device) {
