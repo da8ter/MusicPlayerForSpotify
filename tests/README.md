@@ -30,6 +30,6 @@ Nicht abgedeckt sind der echte Kernel, Spotify und der Browser. Handprobe in ein
 
 - Client-ID eintragen, Redirect-URI im Spotify-Dashboard hinterlegen, in der Kachel anmelden (Pop-up).
 - Chrome oder Safari über die Connect-Adresse: Wiedergabe in der Kachel („Diese Kachel“), Kategorie wechseln, die Musik läuft weiter.
-- iPhone: Kachel zeigt und steuert das Gerät, auf dem Spotify gerade spielt; Geräteauswahl wechselt das Gerät.
+- iPhone, Symcon-App: Kachel spielt selbst (Gerät mit dem Instanznamen aktiv, gemessen 13.10.2026); Geräteauswahl wechselt das Gerät. Safari auf iOS ungeprüft.
 - Variablen und `SPM_*`-Funktionen ohne offene Kachel: Spotify auf dem Handy starten, aus Symcon pausieren, weiter, Lautstärke.
 - Playlist anlegen, befüllen, umbenennen, Titel entfernen, löschen; Gefällt mir; Künstler folgen; Favorit aus der Kachel.

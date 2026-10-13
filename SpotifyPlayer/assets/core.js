@@ -2,7 +2,8 @@
    Zustand melden. Im Browser läuft der SDK-Player einmal im Visu-Hauptfenster (gleicher Ursprung),
    damit die Musik einen Kategoriewechsel übersteht; die Kachel ist dann nur Bedienoberfläche.
    Spielt ein anderes Spotify-Connect-Gerät, zeigt die Kachel dessen Zustand (Abfrage alle 10 s)
-   und steuert es über die Web API. Auf iPhone und iPad gibt es kein SDK; dort nur Fernsteuerung. */
+   und steuert es über die Web API. Das SDK läuft auch in der Symcon-App auf iOS (gemessen 13.10.2026);
+   offiziell unterstützt Spotify mobile Browser nicht. Ohne SDK bleibt nur die Fernsteuerung. */
 (function () {
   'use strict';
   const cfg = window.SPM_CONFIG || {};
@@ -462,7 +463,7 @@
   async function start() {
     if (cfg.mode !== 'player') { emit('ready'); return; }
     slot().token = token;
-    // SDK-Player: im Hauptfenster, sonst in der Kachel; ohne SDK (iPhone, iPad) nur Fernsteuerung
+    // SDK-Player: im Hauptfenster, sonst in der Kachel; ohne SDK nur Fernsteuerung
     try {
       player = await loadPlayer();
     } catch (e) {
