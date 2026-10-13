@@ -73,11 +73,14 @@
 
   // ── Cover des geöffneten Albums bzw. der Playlist als Hintergrund des Inhalts ──
   function sizeBackdrop() {
+    // Breit ab dem Inhalt (nicht unter die Seitenleiste), schmal über die ganze Kachel bis an den Rand
     const rect = $('panel').getBoundingClientRect();
+    const left = wide ? Math.round(rect.left) : 0;
+    const width = wide ? Math.round(rect.width) : document.documentElement.clientWidth;
     const root = document.documentElement.style;
-    root.setProperty('--backdrop-left', Math.round(rect.left) + 'px');
-    root.setProperty('--backdrop-h', Math.round(rect.width) + 'px');
-    root.setProperty('--cover-h', Math.round(rect.width) + 'px');
+    root.setProperty('--backdrop-left', left + 'px');
+    root.setProperty('--backdrop-h', width + 'px');
+    root.setProperty('--cover-h', width + 'px');
   }
   let backdropOverride = null;
   let backdropShown = '';
@@ -421,7 +424,8 @@
     // Sehr kleine Kachel: nur Cover und Steuerung (layout.css, html.compact)
     document.documentElement.classList.toggle('compact', h <= 320 || (w <= 420 && h <= 520));
     const isWide = w >= WIDE;
-    sizeBackdrop();
+    // Erst nach dem Umschalten messen (Seitenleiste da oder weg)
+    requestAnimationFrame(sizeBackdrop);
     if (isWide === wide) return;
     wide = isWide;
     document.documentElement.classList.toggle('wide', wide);
