@@ -38,6 +38,9 @@
   function action(ident, value) { try { requestAction(ident, value); } catch (e) { /* außerhalb von Symcon */ } }
   // Fehler der Kachel landen im Debug-Fenster der Instanz (Fehlersuche ohne Browser-Konsole)
   function debug(text) { action('Debug', String(text).slice(0, 1000)); }
+  // Lebenslauf des Players je Ansicht (normale und vergrößerte Kachel unterscheiden sich an der Kennung)
+  const VIEW = Math.random().toString(36).slice(2, 6);
+  const trace = text => debug('[' + VIEW + '] ' + text);
   window.addEventListener('error', e => debug('error: ' + (e.message || '') + ' @' + (e.lineno || 0)));
   window.addEventListener('unhandledrejection', e => debug('rejection: ' + errText(e.reason)));
 
@@ -155,6 +158,7 @@
     if (!player || win !== window || (local && !local.paused)) return;
     // local kann kurz nach einem Gerätewechsel fehlen: meldet Spotify dieses Gerät als spielend, verbunden lassen
     if (remote && remote.is_playing && remote.device && remote.device.id === slot().deviceId) return;
+    trace('Player abgemeldet ' + slot().deviceId);
     for (let i = bound.length - 1; i >= 0; i--) {
       if (bound[i][0] === player) { try { player.removeListener(bound[i][1], bound[i][2]); } catch (e) { /* egal */ } bound.splice(i, 1); }
     }
@@ -171,11 +175,12 @@
   async function reconnectPlayer() {
     if (!dropped || player) return;
     dropped = false;
-    try { player = await loadPlayer(); } catch (e) { debug('sdk tile: ' + errText(e)); player = null; return; }
+    try { player = await loadPlayer(); } catch (e) { trace('neu verbinden: ' + errText(e)); player = null; return; }
     bindPlayer();
     try { local = await player.getCurrentState(); } catch (e) { local = null; }
     emit('state');
     setTimeout(alive, 3000);
+    setTimeout(() => trace('neu verbunden ' + slot().deviceId), 3000);
   }
 
   // ── Zustand: SDK-Player, wenn er das aktive Gerät ist, sonst das abgefragte Connect-Gerät ──
@@ -499,6 +504,8 @@
       try { local = await player.getCurrentState(); } catch (e) { local = null; }
       if (slot().accountError) premiumMissing = true;
     }
+    trace('Start: ' + (player ? 'Player da' : 'kein Player') + ' (' + (host ? 'Hauptfenster' : 'Kachelfenster') + ', ' + document.visibilityState + ')');
+    setTimeout(() => trace('Geräte-ID ' + (slot().deviceId || 'fehlt')), 3000);
     // Chrome & Co. geben den Kopierschutz (Widevine) nur auf sicheren Seiten frei (https, localhost)
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
@@ -507,9 +514,10 @@
     schedulePoll(nextPoll());
     // iOS hält die Skripte im Hintergrund sofort an: gleich abmelden, nicht erst nach einer Wartezeit
     document.addEventListener('visibilitychange', () => {
+      trace(document.visibilityState + (player ? ', Player da, ' + (local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht aktiv') : ', kein Player'));
       if (document.visibilityState === 'visible') { schedulePoll(0); reconnectPlayer(); } else dropIdlePlayer();
     });
-    window.addEventListener('pagehide', dropIdlePlayer);
+    window.addEventListener('pagehide', () => { trace('pagehide'); dropIdlePlayer(); });
     report(true);
     // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar mit
     // gelungener eigener Abfrage oder mit spielendem SDK-Player (Ereignisse). Schlagen die Abfragen fehl
