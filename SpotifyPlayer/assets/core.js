@@ -138,7 +138,9 @@
 
   function bindPlayer() {
     on(player, 'player_state_changed', state => {
+      const was = !!local && !local.paused;
       local = state || null;
+      if (was !== (!!local && !local.paused)) trace((local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht mehr aktiv') + ' (' + document.visibilityState + ')');
       if (local) player.getVolume().then(v => { localVolume = Math.round(v * 100); }).catch(() => {});
       emit('state');
       report(false);
@@ -147,6 +149,8 @@
     on(player, 'account_error', () => { premiumMissing = true; emit('notice', T('Spotify Premium is required for playback')); });
     on(player, 'playback_error', e => emit('error', T('Playback failed') + ' (' + errText(e) + ')'));
     on(player, 'initialization_error', e => emit('error', T('Spotify could not be loaded') + ' (' + errText(e) + ')'));
+    on(player, 'not_ready', e => trace('not_ready ' + (e && e.device_id)));
+    on(player, 'autoplay_failed', () => trace('autoplay_failed'));
   }
 
   // Player im Kachelfenster (iOS-App, kein Hauptfenster): pausiert im Hintergrund oder beim Verlassen der
@@ -525,7 +529,8 @@
     schedulePoll(nextPoll());
     // iOS hält die Skripte im Hintergrund sofort an: gleich abmelden, nicht erst nach einer Wartezeit
     document.addEventListener('visibilitychange', () => {
-      trace(document.visibilityState + (player ? ', Player da, ' + (local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht aktiv') : ', kein Player'));
+      trace(document.visibilityState + (player ? ', Player da, ' + (local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht aktiv') : ', kein Player') +
+        ', eigen ' + (slot().deviceId || '-').slice(0, 6) + ', Spotify: ' + (remote && remote.device ? remote.device.name + ' ' + String(remote.device.id).slice(0, 6) + (remote.is_playing ? ' spielt' : ' pausiert') : 'nichts aktiv'));
       if (document.visibilityState === 'visible') { schedulePoll(0); reconnectPlayer(); } else dropIdlePlayer();
     });
     window.addEventListener('pagehide', () => { trace('pagehide'); dropIdlePlayer(); });
