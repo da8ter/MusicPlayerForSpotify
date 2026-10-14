@@ -47,13 +47,13 @@ Aufgebaut wie die Musik-Apps:
 
 ### Die Kachel als Spotify-Connect-Gerät
 
-Im Browser (Mac, Windows, Android) und in der Symcon-App ist die Kachel selbst ein Spotify-Connect-Gerät.
+Im Browser (Mac, Windows, Android) ist die Kachel selbst ein Spotify-Connect-Gerät, in den Symcon-Apps vorerst nicht (siehe unten).
 
 - **Name:** Gerätename der Instanz (Vorgabe „Symcon“) plus Gerätetyp, etwa „Symcon · iPhone“ oder „Symcon · Mac“, auf Android mit Chrome das Modell. Den echten Namen des Geräts geben Browser nicht heraus.
 - **Eigener Name:** *Geräte → Dieses Gerät benennen …* Gespeichert im Browser bzw. in der App, gilt nach dem Neuladen der Visualisierung.
 - **Sichere Adresse nötig:** Gespielt wird nur über https (also die Connect-Adresse) oder `localhost`, nicht über `http://<IP>`.
 - **Läuft weiter:** Der Player bleibt im Fenster der Visualisierung, auch wenn du die Kategorie wechselst.
-- **iPhone und iPad:** In der Symcon-App spielt die Kachel selbst. Ist sie pausiert, meldet sie sich ab, sobald die App in den Hintergrund geht, und verbindet sich beim Zurückkommen neu; eine spielende Kachel bleibt verbunden. Wird die App beendet, bleibt ihr Eintrag bei Spotify eine Weile stehen (entfernen lässt er sich von außen nicht); die Geräteauswahl der Kachel blendet solche verwaisten eigenen Einträge aus, in der Spotify-App erscheinen sie noch. Offiziell unterstützt Spotify mobile Browser aber nicht; in Safari kann es daher anders aussehen.
+- **Symcon-Apps (iPhone, iPad, Android):** Dort spielt die Kachel vorerst nicht selbst, sondern steuert nur andere Spotify-Connect-Geräte, zum Beispiel die Spotify-App auf demselben Telefon, einen Lautsprecher oder den Browser am Rechner. Die Apps bauen eine Kachel bei jedem Maximieren und Kategoriewechsel neu auf; ein Player in der Kachel bräche dabei jedes Mal ab. Öffne Spotify auf dem Telefon einmal, damit es in der Geräteauswahl erscheint.
 
 ### Andere Geräte
 

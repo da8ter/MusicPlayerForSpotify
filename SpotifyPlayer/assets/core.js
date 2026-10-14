@@ -571,11 +571,17 @@
     return (best && best.url) || '';
   }
 
+  // Player in der Kachel, wenn das Hauptfenster nicht erreichbar ist (Symcon-Apps): vorerst aus. Die Apps
+  // verwerfen bzw. frieren Kachelansichten bei jedem Maximieren und Kategoriewechsel ein, die Musik bricht
+  // dann ab (14.10.2026 gemessen). Die Kachel steuert dort nur andere Spotify-Connect-Geräte.
+  const APP_TILE_PLAYER = false;
+
   async function start() {
     if (cfg.mode !== 'player') { emit('ready'); return; }
     slot().token = web.token();
-    // SDK-Player: im Hauptfenster, sonst in der Kachel; ohne SDK nur Fernsteuerung
+    // SDK-Player: im Hauptfenster, sonst in der Kachel (siehe APP_TILE_PLAYER); ohne SDK nur Fernsteuerung
     try {
+      if (!host && !APP_TILE_PLAYER) throw new Error('app');
       player = await loadPlayer();
     } catch (e) {
       debug('sdk ' + (host ? 'host' : 'tile') + ': ' + errText(e));
