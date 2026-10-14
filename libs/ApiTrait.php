@@ -10,6 +10,9 @@ trait MusicPlayerSpotifyApiTrait
 {
     // Eine Gerätewahl gilt nur für den Wechsel, danach zählt wieder das aktive Gerät
     private const WANTED_DEVICE_TTL = 60;
+    // Kachel-Player melden sich alle 30 s (Player); ohne Meldung seit 3 min gilt ihre Geräte-ID als Geist
+    private const PLAYER_ALIVE = 180;
+    private const PLAYER_KEEP = 86400;
 
     private const API_URL = 'https://api.spotify.com';
     private const REPEAT_TO_SPOTIFY = [0 => 'off', 1 => 'context', 2 => 'track'];
@@ -270,10 +273,46 @@ trait MusicPlayerSpotifyApiTrait
                 return $d['id'];
             }
         }
+        $ghosts = $this->GhostPlayers();
+        $ids = array_values(array_diff($ids, $ghosts));
         $tile = $this->GetBuffer('TileDevice');
         if ($tile !== '' && in_array($tile, $ids, true)) {
             return $tile;
         }
         return $ids[0] ?? '';
+    }
+
+    /**
+     * Lebenszeichen der Kachel-Player (Player) und Geister-Abfrage der Geräteauswahl (Ghosts). Spotify lässt
+     * getrennte SDK-Player stundenlang in der Geräteliste stehen und bietet keinen Weg, sie zu entfernen;
+     * das Modul kennt aber die IDs seiner Player und blendet die verstummten aus.
+     */
+    private function HandlePlayers(string $Ident, string $Value): void
+    {
+        if ($Ident === 'Ghosts') {
+            $this->PushToTiles(['type' => 'ghosts', 'ids' => $this->GhostPlayers()]);
+            return;
+        }
+        if (!preg_match('/^[A-Za-z0-9_-]{1,80}$/', $Value)) {
+            throw new InvalidArgumentException('Invalid device');
+        }
+        $players = $this->Players();
+        $players[$Value] = time();
+        $players = array_filter($players, static fn (int $seen): bool => time() - $seen <= self::PLAYER_KEEP);
+        arsort($players);
+        $this->SetBuffer('Players', json_encode(array_slice($players, 0, 50, true)));
+    }
+
+    /** @return array<string, int> Geräte-ID => letzte Meldung */
+    private function Players(): array
+    {
+        $players = json_decode($this->GetBuffer('Players'), true);
+        return is_array($players) ? array_filter($players, 'is_int') : [];
+    }
+
+    /** @return list<string> Geräte-IDs eigener Player, die sich nicht mehr melden */
+    private function GhostPlayers(): array
+    {
+        return array_map('strval', array_keys(array_filter($this->Players(), static fn (int $seen): bool => time() - $seen > self::PLAYER_ALIVE)));
     }
 }

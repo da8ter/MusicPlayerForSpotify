@@ -218,7 +218,7 @@
   // ── Geräte (Spotify Connect): Liste mit Symbol, Tipp holt die Wiedergabe dorthin ──
   async function pickDevice() {
     const sheet = document.getElementById('sheet');
-    const devices = await AMP.devices();
+    const [devices, ghosts] = await Promise.all([AMP.devices(), AMP.ghosts()]);
     const sdk = AMP.sdkDevice();
     const current = AMP.state();
     sheet.innerHTML = '';
@@ -228,7 +228,8 @@
     head.className = 'sheet-title';
     head.textContent = T('Devices');
     box.appendChild(head);
-    const list = devices.filter(d => d && d.id && !d.is_restricted);
+    // Getrennte eigene Player (Geister) ausblenden, außer Spotify hält eins für aktiv
+    const list = devices.filter(d => d && d.id && !d.is_restricted && (d.is_active || d.id === sdk || ghosts.indexOf(d.id) < 0));
     if (sdk && !list.some(d => d.id === sdk)) list.unshift({ id: sdk, name: T('This tile'), type: 'tile' });
     list.forEach(d => {
       const b = document.createElement('button');

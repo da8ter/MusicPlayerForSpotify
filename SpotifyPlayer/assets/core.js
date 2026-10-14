@@ -173,6 +173,7 @@
     bindPlayer();
     try { local = await player.getCurrentState(); } catch (e) { local = null; }
     emit('state');
+    setTimeout(alive, 3000);
   }
 
   // ── Zustand: SDK-Player, wenn er das aktive Gerät ist, sonst das abgefragte Connect-Gerät ──
@@ -285,6 +286,22 @@
 
   async function listDevices() {
     try { return (await call('GET', '/v1/me/player/devices')).devices || []; } catch (e) { return []; }
+  }
+  // Geister: Geräte-IDs eigener Player, die sich beim Modul nicht mehr melden (Spotify listet sie noch
+  // stundenlang). Antwort per Push; ohne Antwort binnen 1,5 s wird nichts ausgeblendet.
+  let ghostWaiters = [];
+  function ghosts() {
+    return new Promise(resolve => {
+      const done = ids => { clearTimeout(timer); ghostWaiters = ghostWaiters.filter(w => w !== done); resolve(ids); };
+      const timer = setTimeout(() => done([]), 1500);
+      ghostWaiters.push(done);
+      action('Ghosts', '');
+    });
+  }
+  // Lebenszeichen des eigenen Players ans Modul (verstummt mit dem Player oder im Hintergrund)
+  function alive() {
+    const id = player && slot().deviceId;
+    if (id) action('Player', id);
   }
 
   // ── Befehle ──
@@ -413,6 +430,7 @@
       return;
     }
     if (msg.type === 'favorites' && Array.isArray(msg.favorites)) { cfg.favorites = msg.favorites; emit('favorites'); }
+    if (msg.type === 'ghosts' && Array.isArray(msg.ids)) ghostWaiters.slice().forEach(done => done(msg.ids.filter(id => typeof id === 'string')));
   }
   window.handleMessage = receive;
   window.addEventListener('message', ev => {
@@ -495,11 +513,14 @@
     // gelungener eigener Abfrage oder mit spielendem SDK-Player (Ereignisse). Schlagen die Abfragen fehl
     // (429, gesperrt), schweigt die Kachel, und das Modul fragt wieder selbst.
     setInterval(() => { if ((document.visibilityState === 'visible' && Date.now() - pollOkAt < 75000) || local) report(true); }, 30000);
+    setTimeout(alive, 3000);
+    setInterval(alive, 30000);
   }
 
   window.AMP = {
     cfg, T, start, run, api, apiAll, call, clearCache, login, logout, state, artwork, debug,
     devices: listDevices,
+    ghosts,
     onChange: fn => listeners.push(fn),
     notify: text => emit('notice', text),
     hasPlayer: () => !!player && !premiumMissing,

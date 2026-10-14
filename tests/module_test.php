@@ -124,6 +124,13 @@ check($module->Pause() && str_contains(end($module->http)['url'], 'device_id=dev
 $module->buffers['WantedDevice'] = 'dev1|' . (time() - 120);
 $module->responses = [['status' => 204, 'body' => '']];
 check($module->Pause() && !str_contains(end($module->http)['url'], 'device_id'), 'Gerätewahl verfällt nach 60 s, dann wieder das aktive Gerät');
+$module->buffers['Players'] = json_encode(['ghost1' => time() - 600, '12345' => time() - 600]);
+$module->RequestAction('Player', 'live1');
+$module->RequestAction('Ghosts', '');
+check(end($module->updates) === ['type' => 'ghosts', 'ids' => ['ghost1', '12345']] && throws(fn () => $module->RequestAction('Player', 'x y'), InvalidArgumentException::class), 'Kachel-Player: Lebenszeichen gemerkt, verstummte IDs als Geister gemeldet (auch rein numerische als Text)');
+$module->buffers['TileDevice'] = '';
+$module->responses = [['status' => 404, 'body' => '{"error":{"status":404,"reason":"NO_ACTIVE_DEVICE"}}'], $json(['devices' => [['id' => 'ghost1', 'name' => 'Symcon · iPhone', 'is_active' => false], ['id' => 'dev1', 'name' => 'Küche', 'is_active' => false]]]), ['status' => 204, 'body' => '']];
+check($module->Next() && str_contains(end($module->http)['url'], 'device_id=dev1'), 'Ohne aktives Gerät: kein Geist als Ziel, sondern das nächste Gerät');
 check(throws(fn () => $module->RequestAction('Device', 'x y'), InvalidArgumentException::class) && throws(fn () => $module->RequestAction('Nope', 1), InvalidArgumentException::class), 'RequestAction: ungültige Geräte-ID und unbekannter Ident abgelehnt');
 $module->responses = [$json(['is_playing' => false, 'item' => ['name' => 'Titel', 'artists' => [['name' => 'A'], ['name' => 'B']], 'album' => ['name' => 'Alb', 'images' => [['url' => 'https://i.scdn.co/x']]]], 'device' => ['id' => 'dev1', 'name' => 'Küche', 'volume_percent' => 40], 'shuffle_state' => true, 'repeat_state' => 'context'])];
 check($module->UpdateState() && $module->values['Artist'] === 'A, B' && $module->values['Volume'] === 40 && $module->values['Repeat'] === 1 && $module->values['Playback'] === 3 && $module->values['Device'] === 'Küche', 'UpdateState: Zustand des aktiven Geräts in den Variablen');

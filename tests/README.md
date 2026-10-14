@@ -20,7 +20,7 @@ git diff --check
 - **Anmeldung (PKCE):** Anmeldeadresse mit Client-ID, Redirect-URI aus der Connect-Adresse und Scopes; Challenge = SHA-256 des Prüfwerts; Rückruf lehnt unbekannte Zustände ohne Netzaufruf ab; Token-Tausch mit Prüfwert und ohne Client Secret; Profil geholt; Token nur verschlüsselt; Zustand gilt nur einmal.
 - **Hook:** Fehler von Spotify und unbekannte Zustände werden angezeigt, Eingaben landen nicht roh in der Seite.
 - **Token-Erneuerung:** neues Token geht per Push an die Kacheln; die Web API erneuert bei 401 einmal und wiederholt.
-- **Befehle und Geräte:** aktives Gerät, sonst Kachel-Gerät; ohne Gerät false mit Logmeldung; Playlist als Kontext, Titel als `uris`; `TransferPlayback` nach Namen; ungültige Eingaben abgelehnt.
+- **Befehle und Geräte:** aktives Gerät, sonst Kachel-Gerät, nie ein verstummter eigener Player (Geist); ohne Gerät false mit Logmeldung; Playlist als Kontext, Titel als `uris`; `TransferPlayback` nach Namen; ungültige Eingaben abgelehnt.
 - **Zustand:** aus der Kachel (Werte begrenzt, nur https-Cover) und per `UpdateState` aus `/v1/me/player`.
 - **Variablen:** nur Darstellungen, Aktionen nur an schaltbaren Variablen, stabile Favoriten-Indizes.
 - **Kachel:** alle Platzhalter ersetzt; Konfiguration angemeldet und abgemeldet; alle `T('…')`-Texte der Kachel stehen in `TILE_TEXTS`.

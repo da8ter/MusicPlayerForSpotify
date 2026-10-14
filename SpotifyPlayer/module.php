@@ -267,6 +267,10 @@ class MusicPlayerForSpotify extends IPSModuleStrict
                 }
                 $this->SetBuffer('WantedDevice', $device . '|' . time());
                 return;
+            case 'Player':
+            case 'Ghosts':
+                $this->HandlePlayers($Ident, (string) $Value);
+                return;
             case 'AddFavorite':
                 $this->QueueFavorite((string) $Value);
                 return;
@@ -465,7 +469,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             $this->SetIfChanged($ident, '');
         }
         $this->SetIfChanged('Playback', 1);
-        foreach (['TileDevice', 'WantedDevice', 'PendingFavorites'] as $buffer) {
+        foreach (['TileDevice', 'WantedDevice', 'PendingFavorites', 'Players'] as $buffer) {
             $this->SetBuffer($buffer, '');
         }
     }
