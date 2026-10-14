@@ -120,7 +120,7 @@ Alle Funktionen geben `false` zurück und schreiben ins Log, wenn kein Gerät er
 
 ## Nutzungsbedingungen und Datenschutz
 
-Das Modul nutzt die Spotify-Plattform über die Spotify-App von Symcon, die auch Symcons eigenes Spotify-Modul verwendet. Für die Nutzung gelten die Spotify-Nutzungsbedingungen; für das Modul selbst die [Spotify Developer Terms](https://developer.spotify.com/terms).
+Das Modul nutzt die Spotify-Plattform über die Spotify-App von Symcon, die auch Symcons eigenes Spotify-Modul verwendet. Für die Nutzung gelten die Spotify-Nutzungsbedingungen.
 
 ### Nutzungsbedingungen
 
