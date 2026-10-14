@@ -38,9 +38,6 @@
   function action(ident, value) { try { requestAction(ident, value); } catch (e) { /* außerhalb von Symcon */ } }
   // Fehler der Kachel landen im Debug-Fenster der Instanz (Fehlersuche ohne Browser-Konsole)
   function debug(text) { action('Debug', String(text).slice(0, 1000)); }
-  // Lebenslauf des Players je Ansicht (normale und vergrößerte Kachel unterscheiden sich an der Kennung)
-  const VIEW = Math.random().toString(36).slice(2, 6);
-  const trace = text => debug('[' + VIEW + '] ' + text);
   window.addEventListener('error', e => debug('error: ' + (e.message || '') + ' @' + (e.lineno || 0)));
   window.addEventListener('unhandledrejection', e => debug('rejection: ' + errText(e.reason)));
 
@@ -138,12 +135,10 @@
 
   function bindPlayer() {
     on(player, 'player_state_changed', state => {
-      const was = !!local && !local.paused;
       // Nach einem Wechsel auf ein anderes Gerät meldet das SDK weiter einen pausierten Zustand; spielt laut
       // Spotify ein anderes Gerät, gilt dieser Player als nicht aktiv
       if (state && state.paused && remote && remote.device && remote.is_playing && remote.device.id !== slot().deviceId) state = null;
       local = state || null;
-      if (was !== (!!local && !local.paused)) trace((local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht mehr aktiv') + ' (' + document.visibilityState + ')');
       if (local) player.getVolume().then(v => { localVolume = Math.round(v * 100); }).catch(() => {});
       emit('state');
       report(false);
@@ -152,8 +147,6 @@
     on(player, 'account_error', () => { premiumMissing = true; emit('notice', T('Spotify Premium is required for playback')); });
     on(player, 'playback_error', e => emit('error', T('Playback failed') + ' (' + errText(e) + ')'));
     on(player, 'initialization_error', e => emit('error', T('Spotify could not be loaded') + ' (' + errText(e) + ')'));
-    on(player, 'not_ready', e => trace('not_ready ' + (e && e.device_id)));
-    on(player, 'autoplay_failed', () => trace('autoplay_failed'));
   }
 
   // Player in der Kachel ohne Hauptfenster (Symcon-Apps): Die Apps bauen eine Kachel bei jedem Maximieren,
@@ -171,20 +164,18 @@
     return creating;
   }
   async function createTilePlayer() {
-    try { player = await loadPlayer(); } catch (e) { trace('Player: ' + errText(e)); player = null; return ''; }
+    try { player = await loadPlayer(); } catch (e) { debug('sdk tile: ' + errText(e)); player = null; return ''; }
     bindPlayer();
     if (slot().accountError) premiumMissing = true;
     for (let i = 0; i < 100 && !slot().deviceId; i++) await sleep(100);
-    trace('Player angelegt ' + (slot().deviceId || 'ohne Geräte-ID'));
     // Während des Verbindens verdeckt: gleich wieder abmelden
-    if (document.visibilityState === 'hidden') { dropTilePlayer('verdeckt'); return ''; }
+    if (document.visibilityState === 'hidden') { dropTilePlayer(); return ''; }
     alive();
     emit('state');
     return slot().deviceId;
   }
-  function dropTilePlayer(why) {
+  function dropTilePlayer() {
     if (!player || !lazyTile) return;
-    trace('Player abgemeldet (' + why + ') ' + slot().deviceId);
     for (let i = bound.length - 1; i >= 0; i--) {
       if (bound[i][0] === player) { try { player.removeListener(bound[i][1], bound[i][2]); } catch (e) { /* egal */ } bound.splice(i, 1); }
     }
@@ -415,7 +406,6 @@
       // antwortet bis dahin mit 404 (gemessen 14.10.2026). Befehle an den eigenen Player bis 7 s nachsetzen.
       const target = command === 'transfer' ? (args && args.id === TILE_ID ? slot().deviceId : args && args.id) : state().deviceId || slot().deviceId;
       if (noDevice && player && target && target === slot().deviceId && attempt < 10) {
-        if (!attempt) trace('404 an den eigenen Player, setze nach');
         await sleep(700);
         return run(command, args, attempt + 1);
       }
@@ -550,8 +540,6 @@
       try { local = await player.getCurrentState(); } catch (e) { local = null; }
       if (slot().accountError) premiumMissing = true;
     }
-    trace('Start: ' + (player ? 'Player da' : 'kein Player') + ' (' + (host ? 'Hauptfenster' : 'Kachelfenster') + ', ' + document.visibilityState + ')');
-    setTimeout(() => trace('Geräte-ID ' + (slot().deviceId || 'fehlt')), 3000);
     // Chrome & Co. geben den Kopierschutz (Widevine) nur auf sicheren Seiten frei (https, localhost)
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
@@ -560,11 +548,9 @@
     schedulePoll(nextPoll());
     // Verdeckt oder verlassen: Player der App-Kachel sofort abmelden (iOS hält die Skripte gleich danach an)
     document.addEventListener('visibilitychange', () => {
-      trace(document.visibilityState + (player ? ', Player da, ' + (local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht aktiv') : ', kein Player') +
-        ', eigen ' + (slot().deviceId || '-').slice(0, 6) + ', Spotify: ' + (remote && remote.device ? remote.device.name + ' ' + String(remote.device.id).slice(0, 6) + (remote.is_playing ? ' spielt' : ' pausiert') : 'nichts aktiv'));
-      if (document.visibilityState === 'visible') schedulePoll(0); else dropTilePlayer('verdeckt');
+      if (document.visibilityState === 'visible') schedulePoll(0); else dropTilePlayer();
     });
-    window.addEventListener('pagehide', () => dropTilePlayer('pagehide'));
+    window.addEventListener('pagehide', dropTilePlayer);
     report(true);
     // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar mit
     // gelungener eigener Abfrage oder mit spielendem SDK-Player (Ereignisse). Schlagen die Abfragen fehl
