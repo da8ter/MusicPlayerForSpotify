@@ -316,21 +316,24 @@
         const id = args.id === TILE_ID ? await ensureTilePlayer() : args.id;
         if (!id) { const e = new Error(T('Spotify could not be loaded')); e.status = 0; throw e; }
         action('Device', id);
-        // Ein gerade angelegtes Gerät lehnt Spotify manchmal noch kurz ab: einmal nachsetzen
-        for (let attempt = 0; ; attempt++) {
-          try { return await call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false }); } catch (e) {
-            if (attempt > 0 || e.status !== 404 || args.id !== TILE_ID) throw e;
-            await sleep(2000);
-          }
-        }
+        const put = () => call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false });
+        return args.id === TILE_ID ? retry404(put) : put();
       }
     }
     return Promise.resolve();
   }
 
   // Liefert true bei Erfolg; Fehler zeigt die Kachel als Hinweis.
+  const STARTS = ['play', 'playItem', 'playUris'];
   function run(command, args, retried) {
-    return Promise.resolve().then(() => perform(command, args || {})).then(() => {
+    return Promise.resolve().then(async () => {
+      // Nirgends ein Gerät aktiv: auf dieser Kachel abspielen (Player bei Bedarf anlegen, Befehl nachsetzen)
+      if (lazyTile && !retried && STARTS.indexOf(command) >= 0 && !state().deviceId && !ownDeviceId()) {
+        emit('notice', T('Connecting this tile…'));
+        if (await ensureTilePlayer()) return retry404(() => perform(command, args || {}));
+      }
+      return perform(command, args || {});
+    }).then(() => {
       // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt
       slot().remoteAt = 0;
       commandAt = Date.now();
@@ -338,9 +341,9 @@
       return true;
     }, async e => {
       const noDevice = e.reason === 'NO_ACTIVE_DEVICE' || e.status === 404;
-      // Kein Gerät aktiv: auf dieser Kachel abspielen, den Player erst jetzt anlegen
-      if (noDevice && lazyTile && !retried && ['play', 'playItem', 'playUris'].indexOf(command) >= 0) {
-        if (!player && sharedDevice()) forgetShared(); // die andere Ansicht ist weg
+      // Das gemerkte Gerät gibt es nicht mehr (andere Ansicht weg): eigenen Player anlegen und nachsetzen
+      if (noDevice && lazyTile && !retried && STARTS.indexOf(command) >= 0) {
+        if (!player && sharedDevice()) forgetShared();
         if (await ensureTilePlayer()) return run(command, args, true);
       }
       if (noDevice) emit('error', T('No device available: open the tile in a browser or start Spotify on a device'));
@@ -453,12 +456,12 @@
   }
 
   // ── Player in der Kachel (iOS-App: Hauptfenster nicht erreichbar) ──
-  // Jeder verbundene SDK-Player ist bei Spotify ein Gerät, und die App beendet ihre Webansicht meist ohne
-  // pagehide: ein beim Öffnen angelegter Player bliebe als Geist („Symcon · iPhone“) stehen, und Spotify
-  // behält solche Geister stundenlang (gemessen 13./14.10.2026). Deshalb entsteht der Player hier erst,
-  // wenn der Nutzer auf dieser Kachel abspielen will, und wird wieder abgemeldet, sobald die Ansicht
-  // pausiert in den Hintergrund geht. Eine Sperre je Instanz lässt nur eine Ansicht (Kachel, vergrößert,
-  // andere Seite) den Player halten; die anderen steuern ihn über seine Geräte-ID fern.
+  // Jeder verbundene SDK-Player ist bei Spotify ein Gerät; ohne Abmeldung bleibt er dort als Geist
+  // („Symcon · iPhone“) stundenlang stehen (gemessen 13./14.10.2026). Deshalb: nur die älteste lebende
+  // Ansicht (die normale Kachel, nicht die vergrößerte) legt den Player an, gleich beim Öffnen, damit Play
+  // sofort geht; die anderen Ansichten steuern ihn über seine Geräte-ID. Abgemeldet wird er beim Verlassen
+  // der Seite und wenn die App pausiert in den Hintergrund geht. Eine Sperre je Instanz verhindert, dass
+  // zwei Ansichten gleichzeitig einen Player bauen.
   const TILE_ID = 'tile'; // Platzhalter in der Geräteauswahl, solange es den Player noch nicht gibt
   const TILE_LOCK = SLOT + '_tilePlayer';
   const VIEWS_KEY = SLOT + '_views';
@@ -502,7 +505,6 @@
     try { [to, at] = String(localStorage.getItem(HOST_KEY) || '').split('|'); } catch (e) { return; }
     if (to !== viewId || Date.now() - Number(at) > 30000) return;
     try { localStorage.removeItem(HOST_KEY); } catch (e) { /* egal */ }
-    debug('Player für eine andere Ansicht anlegen');
     hosting = ensureTilePlayer().catch(() => '').then(() => { hosting = null; });
   }
   function oldestView() {
@@ -526,17 +528,15 @@
     for (let i = 0; i < 100 && !slot().deviceId; i++) await sleep(100);
     return slot().deviceId;
   }
-  // Spotify kennt ein neues Gerät erst kurz nach dem ready-Ereignis: ein Wechsel dorthin schlägt sonst
-  // mit 404 fehl. Warten, bis es in der Geräteliste steht (höchstens 10 s).
-  let registered = '';
-  async function waitRegistered(id) {
-    if (!id || registered === id) return !!id;
-    for (let i = 0; i < 10; i++) {
-      if ((await listDevices()).some(d => d && d.id === id)) { registered = id; return true; }
-      await sleep(1000);
+  // Spotify kennt ein neues Gerät erst ein paar Sekunden nach dem ready-Ereignis und antwortet bis dahin
+  // mit 404: Befehle an ein frisch angelegtes Gerät so lange nachsetzen (höchstens 8 s)
+  async function retry404(fn) {
+    for (let attempt = 0; ; attempt++) {
+      try { return await fn(); } catch (e) {
+        if (attempt >= 11 || e.status !== 404) throw e;
+        await sleep(700);
+      }
     }
-    debug('player ' + id.slice(0, 8) + ' nach 10 s nicht in der Geräteliste');
-    return false;
   }
   // Sperre holen und Player bauen; null, wenn eine andere Ansicht sie hält (dann wird deren Player ferngesteuert)
   function acquireTilePlayer() {
@@ -552,13 +552,16 @@
     });
   }
   // Geräte-ID des Players dieser Ansicht, bei Bedarf angelegt; sonst die einer anderen Ansicht; '' ohne Player
-  async function ensureTilePlayer() {
+  let ensuring = null;
+  function ensureTilePlayer() {
+    if (!ensuring) ensuring = ensureTilePlayerNow().finally(() => { ensuring = null; });
+    return ensuring;
+  }
+  async function ensureTilePlayerNow() {
     let id = !player ? sharedDevice() : '';
     if (!id && !player) {
       const host = oldestView();
-      debug('Player gesucht: ' + Object.keys(views()).length + ' Ansichten, ' + (host === viewId ? 'ich bin die älteste' : 'ältere Ansicht gebeten'));
       if (host !== viewId) id = await requestHost(host);
-      if (host !== viewId) debug('Antwort der älteren Ansicht: ' + (id ? id.slice(0, 8) : 'keine'));
     }
     if (!id && !player) {
       const p = await acquireTilePlayer();
@@ -567,13 +570,16 @@
         id = sharedDevice();
       } else {
         await adoptPlayer(p);
-        heartbeat();
         emit('state');
       }
     }
-    if (player) id = await waitDeviceId();
-    await waitRegistered(id);
+    if (player) { id = await waitDeviceId(); heartbeat(); }
     return id;
+  }
+  // Die älteste Ansicht legt den Player gleich an (Play soll sofort gehen); die anderen nutzen ihren
+  function eagerTilePlayer() {
+    if (!lazyTile || player || sharedDevice() || oldestView() !== viewId) return;
+    ensureTilePlayer().catch(() => {});
   }
   // Player dieser Ansicht abmelden: pausiert im Hintergrund (force=false) oder beim Verlassen der Seite
   function dropTilePlayer(force) {
@@ -609,7 +615,7 @@
       }
     }
     lazyTile = !host;
-    if (lazyTile) { heartbeat(); setInterval(heartbeat, 2000); }
+    if (lazyTile) { heartbeat(); setInterval(heartbeat, 2000); setInterval(hostIfAsked, 300); eagerTilePlayer(); }
     // Chrome & Co. geben den Kopierschutz (Widevine) nur auf sicheren Seiten frei (https, localhost)
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
@@ -617,8 +623,15 @@
     loadLastPlayed();
     schedulePoll(nextPoll());
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') schedulePoll(0);
-      else dropTilePlayer(false);
+      if (document.visibilityState === 'visible') { schedulePoll(0); eagerTilePlayer(); return; }
+      // Verdeckt eine andere Ansicht (vergrößerte Kachel) diese nur, läuft die App weiter: Player behalten.
+      // Im Hintergrund schweigen auch die anderen Ansichten, dann abmelden (sofern pausiert).
+      setTimeout(() => {
+        if (document.visibilityState !== 'hidden') return;
+        const all = views();
+        const others = Object.keys(all).filter(k => k !== viewId && Date.now() - (all[k].seen || 0) < 4000);
+        if (!others.length) dropTilePlayer(false);
+      }, 2500);
     });
     window.addEventListener('pagehide', () => dropTilePlayer(true));
     report(true);
