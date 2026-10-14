@@ -144,7 +144,6 @@
       if (state && state.paused && remote && remote.device && remote.is_playing && remote.device.id !== slot().deviceId) state = null;
       local = state || null;
       if (was !== (!!local && !local.paused)) trace((local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht mehr aktiv') + ' (' + document.visibilityState + ')');
-      if (!local || local.paused) forgetPlaying();
       if (local) player.getVolume().then(v => { localVolume = Math.round(v * 100); }).catch(() => {});
       emit('state');
       report(false);
@@ -157,16 +156,35 @@
     on(player, 'autoplay_failed', () => trace('autoplay_failed'));
   }
 
-  // Player im Kachelfenster (iOS-App, kein Hauptfenster): pausiert im Hintergrund oder beim Verlassen der
-  // Seite bei Spotify abmelden. Beendet die App die Webansicht, bleibt ein verbundener Player dort sonst
-  // stundenlang als Geist stehen (13./14.10.2026 gemessen). Ein spielender Player bleibt immer verbunden,
-  // damit die Musik beim Wechsel der Ansicht weiterläuft. Zurück im Vordergrund wird neu verbunden.
-  let dropped = false;
-  function dropIdlePlayer() {
-    if (!player || win !== window || (local && !local.paused)) return;
-    // local kann kurz nach einem Gerätewechsel fehlen: meldet Spotify dieses Gerät als spielend, verbunden lassen
-    if (remote && remote.is_playing && remote.device && remote.device.id === slot().deviceId) return;
-    trace('Player abgemeldet ' + slot().deviceId);
+  // Player in der Kachel ohne Hauptfenster (Symcon-Apps): Die Apps bauen eine Kachel bei jedem Maximieren,
+  // Schließen und Kategoriewechsel neu auf und verwerfen oder frieren die alte ein, ohne der Seite etwas zu
+  // melden (App 9.0.4 entschlüsselt und gemessen 14.10.2026). Jeder verbundene Player bliebe dabei bei
+  // Spotify als weiteres Gerät stehen. Deshalb entsteht er erst, wenn auf dieser Kachel gespielt wird, und
+  // meldet sich ab, sobald die Ansicht verdeckt oder verlassen wird; die Musik stoppt dann.
+  const TILE_ID = 'tile'; // „Diese Kachel“ in der Geräteauswahl, solange es noch keinen Player gibt
+  const STARTS = ['play', 'playItem', 'playUris'];
+  let lazyTile = false;
+  let creating = null;
+  function ensureTilePlayer() {
+    if (player) return Promise.resolve(slot().deviceId);
+    if (!creating) creating = createTilePlayer().finally(() => { creating = null; });
+    return creating;
+  }
+  async function createTilePlayer() {
+    try { player = await loadPlayer(); } catch (e) { trace('Player: ' + errText(e)); player = null; return ''; }
+    bindPlayer();
+    if (slot().accountError) premiumMissing = true;
+    for (let i = 0; i < 100 && !slot().deviceId; i++) await sleep(100);
+    trace('Player angelegt ' + (slot().deviceId || 'ohne Geräte-ID'));
+    // Während des Verbindens verdeckt: gleich wieder abmelden
+    if (document.visibilityState === 'hidden') { dropTilePlayer('verdeckt'); return ''; }
+    alive();
+    emit('state');
+    return slot().deviceId;
+  }
+  function dropTilePlayer(why) {
+    if (!player || !lazyTile) return;
+    trace('Player abgemeldet (' + why + ') ' + slot().deviceId);
     for (let i = bound.length - 1; i >= 0; i--) {
       if (bound[i][0] === player) { try { player.removeListener(bound[i][1], bound[i][2]); } catch (e) { /* egal */ } bound.splice(i, 1); }
     }
@@ -177,73 +195,8 @@
     s.player = null;
     s.deviceId = '';
     s.state = 'new'; // inject() erkennt das geladene SDK
-    dropped = true;
+    s.remoteAt = 0;
     emit('state');
-  }
-  async function reconnectPlayer() {
-    if (!dropped || player) return;
-    dropped = false;
-    try { player = await loadPlayer(); } catch (e) { trace('neu verbinden: ' + errText(e)); player = null; return; }
-    bindPlayer();
-    try { local = await player.getCurrentState(); } catch (e) { local = null; }
-    emit('state');
-    setTimeout(alive, 3000);
-    setTimeout(() => trace('neu verbunden ' + slot().deviceId), 3000);
-  }
-
-  // Übergabe zwischen Ansichten: Die App verwirft eine Kachelansicht manchmal ganz ohne Ereignis (gemessen
-  // 14.10.2026: die spielende Ansicht verschwand beim Maximieren ohne hidden und pagehide, die Musik brach ab);
-  // andere Male bleibt sie verdeckt und spielt weiter. Die spielende Ansicht hinterlegt darum alle 2 s Titel
-  // und Stelle. Findet eine neue sichtbare Ansicht den Stand ohne frisches Lebenszeichen vor, spielt sie dort
-  // weiter. Spotify hat je Konto nur ein aktives Gerät, doppelt spielt also nie etwas.
-  const PLAYING_KEY = SLOT + '_playing';
-  function readPlaying() {
-    try { return JSON.parse(localStorage.getItem(PLAYING_KEY) || 'null'); } catch (e) { return null; }
-  }
-  // Eigenen Stand löschen; any: jeden (die Wiedergabe gehört jetzt einem anderen Gerät)
-  function forgetPlaying(any) {
-    const note = readPlaying();
-    if (note && (any || note.view === VIEW)) { try { localStorage.removeItem(PLAYING_KEY); } catch (e) { /* egal */ } }
-  }
-  async function notePlaying() {
-    if (!player || !local || local.paused) return;
-    let st = null;
-    try { st = await player.getCurrentState(); } catch (e) { return; }
-    const t = st && !st.paused && st.track_window && st.track_window.current_track;
-    if (!t) return;
-    try {
-      localStorage.setItem(PLAYING_KEY, JSON.stringify({ view: VIEW, device: slot().deviceId, uri: t.uri, context: (st.context && st.context.uri) || '', position: st.position || 0, at: Date.now() }));
-    } catch (e) { /* egal */ }
-  }
-  // In den ersten 20 s einer Ansicht: verstummt der hinterlegte Stand (älter als 5 s), hier weiterspielen
-  async function takeOver(startedAt) {
-    const note = readPlaying();
-    const age = note ? Date.now() - (note.at || 0) : 0;
-    if (Date.now() - startedAt > 20000) return;
-    if (!note || note.view === VIEW || age < 5000 || age > 30000 || !player || !slot().deviceId || document.visibilityState !== 'visible' || (local && !local.paused)) {
-      setTimeout(() => takeOver(startedAt), 1000);
-      return;
-    }
-    if (!/^spotify:track:[A-Za-z0-9]{22}$/.test(String(note.uri))) return;
-    // Sofort als eigenen Stand eintragen, damit keine weitere Ansicht ebenfalls übernimmt
-    try { localStorage.setItem(PLAYING_KEY, JSON.stringify(Object.assign({}, note, { view: VIEW, device: slot().deviceId, at: Date.now() }))); } catch (e) { /* egal */ }
-    // Nur übernehmen, wenn nichts spielt oder noch der verschwundene Player als aktiv gilt; spielt ein
-    // anderes Gerät (Mac, Lautsprecher), gehört die Wiedergabe ihm
-    let now = null;
-    try { now = await call('GET', '/v1/me/player'); } catch (e) { forgetPlaying(); return; }
-    if (now && now.device && now.is_playing && now.device.id !== note.device) { trace('keine Übernahme, es spielt ' + now.device.name); forgetPlaying(); return; }
-    const body = /^spotify:(album|playlist):[A-Za-z0-9]{22}$/.test(String(note.context)) ? { context_uri: note.context, offset: { uri: note.uri } } : { uris: [note.uri] };
-    // Die alte Ansicht spielt nicht weiter: iOS friert eine verdeckte Kachel samt Ton ein, eine verworfene
-    // ist weg (gemessen 14.10.2026). Also dort fortsetzen, wo sie zuletzt war (höchstens 2 s nach dem Stand)
-    body.position_ms = Math.max(0, Math.round((note.position || 0) + Math.min(age, 2000)));
-    trace('übernehme die Wiedergabe von [' + note.view + '] (' + Math.round(age / 1000) + ' s still)');
-    for (let attempt = 0; attempt < 10; attempt++) {
-      try { await call('PUT', '/v1/me/player/play', { device_id: slot().deviceId }, body); return; } catch (e) {
-        if (e.status !== 404) { trace('Übernahme: ' + errText(e)); forgetPlaying(); return; }
-        await sleep(700);
-      }
-    }
-    forgetPlaying();
   }
 
   // ── Zustand: SDK-Player, wenn er das aktive Gerät ist, sonst das abgefragte Connect-Gerät ──
@@ -328,9 +281,8 @@
         s.remoteJson = JSON.stringify(remote);
         s.remoteAt = remoteAt;
       }
-      // Spielt ein anderes Gerät, ist der SDK-Zustand veraltet und kein Stand mehr zu übernehmen
+      // Spielt ein anderes Gerät, ist der SDK-Zustand veraltet
       if (remote && remote.device.id !== slot().deviceId) local = null;
-      if (remote && remote.is_playing) { const note = readPlaying(); if (note && note.device !== remote.device.id) forgetPlaying(true); }
       pollOkAt = Date.now();
       emit('state');
       report(false);
@@ -432,11 +384,14 @@
       }
       case 'playUris': return call('PUT', '/v1/me/player/play', deviceParam(), { uris: args.uris });
       case 'queue': return call('POST', '/v1/me/player/queue', Object.assign({ uri: args.uri }, deviceParam()));
-      case 'transfer':
-        forgetPlaying(true);
-        if (args.id !== slot().deviceId) local = null;
-        action('Device', args.id);
-        return call('PUT', '/v1/me/player', {}, { device_ids: [args.id], play: args.play !== false });
+      case 'transfer': {
+        // „Diese Kachel“ ohne Player: jetzt anlegen
+        const id = args.id === TILE_ID ? await ensureTilePlayer() : args.id;
+        if (!id) { const e = new Error(T('Spotify could not be loaded')); e.status = 0; throw e; }
+        if (id !== slot().deviceId) local = null;
+        action('Device', id);
+        return call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false });
+      }
     }
     return Promise.resolve();
   }
@@ -444,7 +399,11 @@
   // Liefert true bei Erfolg; Fehler zeigt die Kachel als Hinweis.
   function run(command, args, attempt) {
     attempt = attempt || 0;
-    return Promise.resolve().then(() => perform(command, args || {})).then(() => {
+    return Promise.resolve().then(async () => {
+      // Läuft nirgends etwas, spielt Play auf dieser Kachel: Player in der App erst jetzt anlegen
+      if (lazyTile && !player && !attempt && STARTS.indexOf(command) >= 0 && !state().deviceId) await ensureTilePlayer();
+      return perform(command, args || {});
+    }).then(() => {
       // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt
       slot().remoteAt = 0;
       commandAt = Date.now();
@@ -452,10 +411,9 @@
       return true;
     }, async e => {
       const noDevice = e.reason === 'NO_ACTIVE_DEVICE' || e.status === 404;
-      // Jede Ansicht in der App verbindet beim Öffnen einen neuen Player; Spotify kennt ihn erst ein paar
-      // Sekunden nach dem ready-Ereignis und antwortet bis dahin mit 404 (gemessen 14.10.2026). Befehle an
-      // den eigenen Player deshalb bis 7 s nachsetzen.
-      const target = command === 'transfer' ? args && args.id : state().deviceId || slot().deviceId;
+      // Spotify kennt einen frisch verbundenen Player erst ein paar Sekunden nach dem ready-Ereignis und
+      // antwortet bis dahin mit 404 (gemessen 14.10.2026). Befehle an den eigenen Player bis 7 s nachsetzen.
+      const target = command === 'transfer' ? (args && args.id === TILE_ID ? slot().deviceId : args && args.id) : state().deviceId || slot().deviceId;
       if (noDevice && player && target && target === slot().deviceId && attempt < 10) {
         if (!attempt) trace('404 an den eigenen Player, setze nach');
         await sleep(700);
@@ -571,21 +529,17 @@
     return (best && best.url) || '';
   }
 
-  // Player in der Kachel, wenn das Hauptfenster nicht erreichbar ist (Symcon-Apps): vorerst aus. Die Apps
-  // verwerfen bzw. frieren Kachelansichten bei jedem Maximieren und Kategoriewechsel ein, die Musik bricht
-  // dann ab (14.10.2026 gemessen). Die Kachel steuert dort nur andere Spotify-Connect-Geräte.
-  const APP_TILE_PLAYER = false;
-
   async function start() {
     if (cfg.mode !== 'player') { emit('ready'); return; }
     slot().token = web.token();
-    // SDK-Player: im Hauptfenster, sonst in der Kachel (siehe APP_TILE_PLAYER); ohne SDK nur Fernsteuerung
-    try {
-      if (!host && !APP_TILE_PLAYER) throw new Error('app');
-      player = await loadPlayer();
-    } catch (e) {
-      debug('sdk ' + (host ? 'host' : 'tile') + ': ' + errText(e));
-      if (host) {
+    // SDK-Player: im Hauptfenster gleich beim Laden (überlebt Kategoriewechsel); ohne Hauptfenster (Apps)
+    // erst auf Wunsch, siehe ensureTilePlayer; ohne SDK nur Fernsteuerung
+    if (!host) lazyTile = true;
+    else {
+      try {
+        player = await loadPlayer();
+      } catch (e) {
+        debug('sdk host: ' + errText(e));
         host = null;
         win = window;
         try { player = await loadPlayer(); } catch (e2) { player = null; }
@@ -604,13 +558,13 @@
     await poll();
     loadLastPlayed();
     schedulePoll(nextPoll());
-    // iOS hält die Skripte im Hintergrund sofort an: gleich abmelden, nicht erst nach einer Wartezeit
+    // Verdeckt oder verlassen: Player der App-Kachel sofort abmelden (iOS hält die Skripte gleich danach an)
     document.addEventListener('visibilitychange', () => {
       trace(document.visibilityState + (player ? ', Player da, ' + (local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht aktiv') : ', kein Player') +
         ', eigen ' + (slot().deviceId || '-').slice(0, 6) + ', Spotify: ' + (remote && remote.device ? remote.device.name + ' ' + String(remote.device.id).slice(0, 6) + (remote.is_playing ? ' spielt' : ' pausiert') : 'nichts aktiv'));
-      if (document.visibilityState === 'visible') { schedulePoll(0); reconnectPlayer(); } else dropIdlePlayer();
+      if (document.visibilityState === 'visible') schedulePoll(0); else dropTilePlayer('verdeckt');
     });
-    window.addEventListener('pagehide', () => { trace('pagehide'); dropIdlePlayer(); });
+    window.addEventListener('pagehide', () => dropTilePlayer('pagehide'));
     report(true);
     // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar mit
     // gelungener eigener Abfrage oder mit spielendem SDK-Player (Ereignisse). Schlagen die Abfragen fehl
@@ -618,7 +572,6 @@
     setInterval(() => { if ((document.visibilityState === 'visible' && Date.now() - pollOkAt < 75000) || local) report(true); }, 30000);
     setTimeout(alive, 3000);
     setInterval(alive, 30000);
-    if (win === window) { setInterval(notePlaying, 2000); takeOver(Date.now()); }
   }
 
   window.AMP = {
@@ -629,6 +582,9 @@
     notify: text => emit('notice', text),
     hasPlayer: () => !!player && !premiumMissing,
     sdkDevice: () => slot().deviceId,
+    // Kann diese Kachel selbst abspielen (Player da oder in der App auf Wunsch anlegbar)?
+    canPlayHere: () => (!!player || lazyTile) && !premiumMissing,
+    TILE_ID,
     premiumMissing: () => premiumMissing,
     // Ist dieser Eintrag der zuletzt gestartete Kontext bzw. der laufende Titel?
     isCurrent: play => {
