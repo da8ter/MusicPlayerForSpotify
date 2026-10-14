@@ -146,6 +146,35 @@
     on(player, 'initialization_error', e => emit('error', T('Spotify could not be loaded') + ' (' + errText(e) + ')'));
   }
 
+  // Player im Kachelfenster (iOS-App, kein Hauptfenster): pausiert im Hintergrund oder beim Verlassen der
+  // Seite bei Spotify abmelden. Beendet die App die Webansicht, bleibt ein verbundener Player dort sonst
+  // stundenlang als Geist stehen (13./14.10.2026 gemessen). Ein spielender Player bleibt immer verbunden,
+  // damit die Musik beim Wechsel der Ansicht weiterläuft. Zurück im Vordergrund wird neu verbunden.
+  let dropped = false;
+  function dropIdlePlayer() {
+    if (!player || win !== window || (local && !local.paused)) return;
+    for (let i = bound.length - 1; i >= 0; i--) {
+      if (bound[i][0] === player) { try { player.removeListener(bound[i][1], bound[i][2]); } catch (e) { /* egal */ } bound.splice(i, 1); }
+    }
+    try { player.disconnect(); } catch (e) { /* egal */ }
+    player = null;
+    local = null;
+    const s = slot();
+    s.player = null;
+    s.deviceId = '';
+    s.state = 'new'; // inject() erkennt das geladene SDK
+    dropped = true;
+    emit('state');
+  }
+  async function reconnectPlayer() {
+    if (!dropped || player) return;
+    dropped = false;
+    try { player = await loadPlayer(); } catch (e) { debug('sdk tile: ' + errText(e)); player = null; return; }
+    bindPlayer();
+    try { local = await player.getCurrentState(); } catch (e) { local = null; }
+    emit('state');
+  }
+
   // ── Zustand: SDK-Player, wenn er das aktive Gerät ist, sonst das abgefragte Connect-Gerät ──
   const REPEAT_FROM_API = { off: 0, context: 1, track: 2 };
   const REPEAT_TO_API = { 0: 'off', 1: 'context', 2: 'track' };
@@ -456,7 +485,11 @@
     await poll();
     loadLastPlayed();
     schedulePoll(nextPoll());
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') schedulePoll(0); });
+    // iOS hält die Skripte im Hintergrund sofort an: gleich abmelden, nicht erst nach einer Wartezeit
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') { schedulePoll(0); reconnectPlayer(); } else dropIdlePlayer();
+    });
+    window.addEventListener('pagehide', dropIdlePlayer);
     report(true);
     // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar mit
     // gelungener eigener Abfrage oder mit spielendem SDK-Player (Ereignisse). Schlagen die Abfragen fehl

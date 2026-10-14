@@ -53,7 +53,7 @@ Im Browser (Mac, Windows, Android) und in der Symcon-App ist die Kachel selbst e
 - **Eigener Name:** *Geräte → Dieses Gerät benennen …* Gespeichert im Browser bzw. in der App, gilt nach dem Neuladen der Visualisierung.
 - **Sichere Adresse nötig:** Gespielt wird nur über https (also die Connect-Adresse) oder `localhost`, nicht über `http://<IP>`.
 - **Läuft weiter:** Der Player bleibt im Fenster der Visualisierung, auch wenn du die Kategorie wechselst.
-- **iPhone und iPad:** In der Symcon-App spielt die Kachel selbst. Offiziell unterstützt Spotify mobile Browser aber nicht; in Safari kann es daher anders aussehen.
+- **iPhone und iPad:** In der Symcon-App spielt die Kachel selbst. Ist sie pausiert, meldet sie sich ab, sobald die App in den Hintergrund geht, und verbindet sich beim Zurückkommen neu; eine spielende Kachel bleibt verbunden. Offiziell unterstützt Spotify mobile Browser aber nicht; in Safari kann es daher anders aussehen.
 
 ### Andere Geräte
 
