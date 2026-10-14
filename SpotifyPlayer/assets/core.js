@@ -312,23 +312,32 @@
       }
       case 'playUris': return call('PUT', '/v1/me/player/play', deviceParam(), { uris: args.uris });
       case 'queue': return call('POST', '/v1/me/player/queue', Object.assign({ uri: args.uri }, deviceParam()));
-      case 'transfer':
-        action('Device', args.id);
-        return call('PUT', '/v1/me/player', {}, { device_ids: [args.id], play: args.play !== false });
+      case 'transfer': {
+        const id = args.id === TILE_ID ? await ensureTilePlayer() : args.id;
+        if (!id) { const e = new Error(T('Spotify could not be loaded')); e.status = 0; throw e; }
+        action('Device', id);
+        return call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false });
+      }
     }
     return Promise.resolve();
   }
 
   // Liefert true bei Erfolg; Fehler zeigt die Kachel als Hinweis.
-  function run(command, args) {
+  function run(command, args, retried) {
     return Promise.resolve().then(() => perform(command, args || {})).then(() => {
       // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt
       slot().remoteAt = 0;
       commandAt = Date.now();
       schedulePoll(command === 'volume' ? 1500 : 600);
       return true;
-    }, e => {
-      if (e.reason === 'NO_ACTIVE_DEVICE' || e.status === 404) emit('error', T('No device available: open the tile in a browser or start Spotify on a device'));
+    }, async e => {
+      const noDevice = e.reason === 'NO_ACTIVE_DEVICE' || e.status === 404;
+      // Kein Gerät aktiv: auf dieser Kachel abspielen, den Player erst jetzt anlegen
+      if (noDevice && lazyTile && !retried && ['play', 'playItem', 'playUris'].indexOf(command) >= 0) {
+        if (!player && sharedDevice()) forgetShared(); // die andere Ansicht ist weg
+        if (await ensureTilePlayer()) return run(command, args, true);
+      }
+      if (noDevice) emit('error', T('No device available: open the tile in a browser or start Spotify on a device'));
       else if (e.reason === 'PREMIUM_REQUIRED') emit('error', T('Spotify Premium is required for playback'));
       else if (e.status !== 401) emit('error', T('Playback failed') + ' (' + errText(e) + ')');
       return false;
@@ -438,16 +447,33 @@
   }
 
   // ── Player in der Kachel (iOS-App: Hauptfenster nicht erreichbar) ──
-  // Jede Kachelansicht (auch die vergrößerte, andere Seiten mit derselben Kachel) würde ein eigenes
-  // Spotify-Gerät anmelden. Eine Sperre je Instanz lässt nur eine Ansicht den Player bauen; die anderen
-  // steuern ihn fern und übernehmen, sobald die besitzende Ansicht verschwindet.
+  // Jeder verbundene SDK-Player ist bei Spotify ein Gerät, und die App beendet ihre Webansicht meist ohne
+  // pagehide: ein beim Öffnen angelegter Player bliebe als Geist („Symcon · iPhone“) stehen, und Spotify
+  // behält solche Geister stundenlang (gemessen 13./14.10.2026). Deshalb entsteht der Player hier erst,
+  // wenn der Nutzer auf dieser Kachel abspielen will, und wird wieder abgemeldet, sobald die Ansicht
+  // pausiert in den Hintergrund geht. Eine Sperre je Instanz lässt nur eine Ansicht (Kachel, vergrößert,
+  // andere Seite) den Player halten; die anderen steuern ihn über seine Geräte-ID fern.
+  const TILE_ID = 'tile'; // Platzhalter in der Geräteauswahl, solange es den Player noch nicht gibt
   const TILE_LOCK = SLOT + '_tilePlayer';
-  const sharedDevice = () => { try { return localStorage.getItem(TILE_LOCK) || ''; } catch (e) { return ''; } };
+  const SHARED_TTL = 90000;
+  let lazyTile = false; // Player erst auf Wunsch (Kachelfenster ohne Hauptfenster)
+  let releaseLock = null;
+  let shareTimer = 0;
+  // Geräte-ID des Players einer anderen Ansicht; sie bestätigt sie alle 2 s, sonst gilt sie als tot
+  function sharedDevice() {
+    try {
+      const [id, at] = String(localStorage.getItem(TILE_LOCK) || '').split('|');
+      return id && Date.now() - Number(at || 0) < SHARED_TTL ? id : '';
+    } catch (e) { return ''; }
+  }
+  const forgetShared = () => { try { localStorage.removeItem(TILE_LOCK); } catch (e) { /* egal */ } };
   const ownDeviceId = () => slot().deviceId || (!player ? sharedDevice() : '');
   function shareDeviceId() {
-    const id = slot().deviceId;
-    if (!id) { setTimeout(shareDeviceId, 500); return; }
-    try { localStorage.setItem(TILE_LOCK, id); } catch (e) { /* egal */ }
+    clearInterval(shareTimer);
+    shareTimer = setInterval(() => {
+      const id = slot().deviceId;
+      if (id) { try { localStorage.setItem(TILE_LOCK, id + '|' + Date.now()); } catch (e) { /* egal */ } }
+    }, 2000);
   }
   async function adoptPlayer(p) {
     player = p;
@@ -455,50 +481,83 @@
     try { local = await player.getCurrentState(); } catch (e) { local = null; }
     if (slot().accountError) premiumMissing = true;
   }
-  // Liefert den Player, wenn diese Ansicht die Sperre bekommt, sonst null (und wartet im Hintergrund darauf)
-  function tilePlayer() {
-    if (!navigator.locks) return loadPlayer().catch(() => null);
-    const hold = () => new Promise(() => {}); // Sperre halten, solange die Ansicht lebt
+  async function waitDeviceId() {
+    for (let i = 0; i < 100 && !slot().deviceId; i++) await sleep(100);
+    return slot().deviceId;
+  }
+  // Sperre holen und Player bauen; null, wenn eine andere Ansicht sie hält (dann wird deren Player ferngesteuert)
+  function acquireTilePlayer() {
+    if (!navigator.locks) return loadPlayer().then(p => p, () => null);
     return new Promise(resolve => {
       navigator.locks.request(TILE_LOCK, { ifAvailable: true }, lock => {
-        if (!lock) {
-          resolve(null);
-          navigator.locks.request(TILE_LOCK, () => loadPlayer().then(async p => {
-            await adoptPlayer(p);
-            shareDeviceId();
-            emit('state');
-            return hold();
-          }, () => null));
-          return null;
-        }
-        return loadPlayer().then(p => { resolve(p); shareDeviceId(); return hold(); }, () => { resolve(null); return null; });
+        if (!lock) { resolve(null); return null; }
+        return new Promise(release => {
+          releaseLock = release;
+          loadPlayer().then(resolve, () => { resolve(null); release(); });
+        });
       });
     });
+  }
+  // Geräte-ID des Players dieser Ansicht, bei Bedarf angelegt; sonst die einer anderen Ansicht; '' ohne Player
+  async function ensureTilePlayer() {
+    if (player) return waitDeviceId();
+    if (sharedDevice()) return sharedDevice();
+    const p = await acquireTilePlayer();
+    if (!p) {
+      for (let i = 0; i < 50 && !sharedDevice(); i++) await sleep(100);
+      return sharedDevice();
+    }
+    await adoptPlayer(p);
+    shareDeviceId();
+    emit('state');
+    return waitDeviceId();
+  }
+  // Player dieser Ansicht abmelden: pausiert im Hintergrund (force=false) oder beim Verlassen der Seite
+  function dropTilePlayer(force) {
+    if (!player || !lazyTile) return;
+    if (!force && local && !local.paused) return;
+    for (let i = bound.length - 1; i >= 0; i--) {
+      if (bound[i][0] === player) { try { player.removeListener(bound[i][1], bound[i][2]); } catch (e) { /* egal */ } bound.splice(i, 1); }
+    }
+    try { player.disconnect(); } catch (e) { /* egal */ }
+    player = null;
+    local = null;
+    const s = slot();
+    s.player = null;
+    s.deviceId = '';
+    s.state = 'new';
+    clearInterval(shareTimer);
+    forgetShared();
+    if (releaseLock) { releaseLock(); releaseLock = null; }
+    emit('state');
   }
 
   async function start() {
     if (cfg.mode !== 'player') { emit('ready'); return; }
     slot().token = web.token();
-    // SDK-Player: im Hauptfenster, sonst in der Kachel (eine Ansicht je Gerät); ohne SDK nur Fernsteuerung
-    let p = null;
+    // SDK-Player: im Hauptfenster gleich beim Laden (überlebt Kategoriewechsel), in der Kachel erst auf
+    // Wunsch (siehe oben); ohne SDK nur Fernsteuerung
     if (host) {
       try {
-        p = await loadPlayer();
+        await adoptPlayer(await loadPlayer());
       } catch (e) {
         debug('sdk host: ' + errText(e));
         host = null;
         win = window;
       }
     }
-    if (!host) p = await tilePlayer();
-    if (p) await adoptPlayer(p);
+    lazyTile = !host;
     // Chrome & Co. geben den Kopierschutz (Widevine) nur auf sicheren Seiten frei (https, localhost)
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
     await poll();
     loadLastPlayed();
     schedulePoll(nextPoll());
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') schedulePoll(0); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') schedulePoll(0);
+      else dropTilePlayer(false);
+    });
+    window.addEventListener('pagehide', () => dropTilePlayer(true));
     report(true);
     // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar mit
     // gelungener eigener Abfrage oder mit spielendem SDK-Player (Ereignisse). Schlagen die Abfragen fehl
@@ -513,6 +572,9 @@
     notify: text => emit('notice', text),
     hasPlayer: () => !!player && !premiumMissing,
     sdkDevice: ownDeviceId,
+    // Kann diese Kachel selbst abspielen (Player da oder auf Wunsch anlegbar)?
+    canPlayHere: () => !!player || lazyTile,
+    TILE_ID,
     premiumMissing: () => premiumMissing,
     // Ist dieser Eintrag der zuletzt gestartete Kontext bzw. der laufende Titel?
     isCurrent: play => {
