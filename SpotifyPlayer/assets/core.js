@@ -271,6 +271,7 @@
     return id ? { device_id: id } : {};
   }
   async function perform(command, args) {
+    if (command === 'noop') return Promise.resolve();
     const current = state();
     const useLocal = player && current.local && local;
     switch (command) {
@@ -328,6 +329,7 @@
   function run(command, args, retried) {
     return Promise.resolve().then(async () => {
       // Nirgends ein Gerät aktiv: auf dieser Kachel abspielen (Player bei Bedarf anlegen, Befehl nachsetzen)
+      if (lazyTile && STARTS.indexOf(command) >= 0) debug('run ' + command + (retried ? ' (nachgesetzt)' : '') + ': aktiv=' + (state().deviceId || '-').slice(0, 8) + ' eigenes=' + (ownDeviceId() || '-').slice(0, 8));
       if (lazyTile && !retried && STARTS.indexOf(command) >= 0 && !state().deviceId && !ownDeviceId()) {
         emit('notice', T('Connecting this tile…'));
         if (await ensureTilePlayer()) return retry404(() => perform(command, args || {}));
@@ -344,7 +346,8 @@
       // Das gemerkte Gerät gibt es nicht mehr (andere Ansicht weg): eigenen Player anlegen und nachsetzen
       if (noDevice && lazyTile && !retried && STARTS.indexOf(command) >= 0) {
         if (!player && sharedDevice()) forgetShared();
-        if (await ensureTilePlayer()) return run(command, args, true);
+        // Das Gerät ist womöglich nur noch nicht registriert: nachsetzen, bis Spotify es annimmt
+        if (await ensureTilePlayer()) return retry404(() => perform(command, args || {})).then(() => run('noop'), () => run(command, args, true));
       }
       if (noDevice) emit('error', T('No device available: open the tile in a browser or start Spotify on a device'));
       else if (e.reason === 'PREMIUM_REQUIRED') emit('error', T('Spotify Premium is required for playback'));
@@ -500,11 +503,13 @@
   // Bitte einer anderen Ansicht (HOST_KEY) annehmen: über das storage-Ereignis und zur Sicherheit alle 2 s
   let hosting = null;
   function hostIfAsked() {
-    if (!lazyTile || player || hosting) return;
+    if (!lazyTile || hosting) return;
     let to = '', at = 0;
     try { [to, at] = String(localStorage.getItem(HOST_KEY) || '').split('|'); } catch (e) { return; }
     if (to !== viewId || Date.now() - Number(at) > 30000) return;
     try { localStorage.removeItem(HOST_KEY); } catch (e) { /* egal */ }
+    debug('Bitte einer anderen Ansicht; Player ' + (player ? 'da' : 'anlegen'));
+    // Player schon da: nur die Geräte-ID gleich wieder bekanntgeben (die andere Ansicht hatte sie verworfen)
     hosting = ensureTilePlayer().catch(() => '').then(() => { hosting = null; });
   }
   function oldestView() {
@@ -559,9 +564,10 @@
   }
   async function ensureTilePlayerNow() {
     let id = !player ? sharedDevice() : '';
+    debug('ensure: player=' + (player ? 'da' : 'nein') + ' shared=' + (id ? id.slice(0, 8) : '-') + ' Ansichten=' + Object.keys(views()).length + (oldestView() === viewId ? ' (ich älteste)' : ''));
     if (!id && !player) {
       const host = oldestView();
-      if (host !== viewId) id = await requestHost(host);
+      if (host !== viewId) { id = await requestHost(host); debug('Antwort: ' + (id ? id.slice(0, 8) : 'keine')); }
     }
     if (!id && !player) {
       const p = await acquireTilePlayer();
@@ -574,6 +580,7 @@
       }
     }
     if (player) { id = await waitDeviceId(); heartbeat(); }
+    debug('ensure -> ' + (id ? id.slice(0, 8) : '-'));
     return id;
   }
   // Die älteste Ansicht legt den Player gleich an (Play soll sofort gehen); die anderen nutzen ihren
