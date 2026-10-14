@@ -329,7 +329,6 @@
   function run(command, args, retried) {
     return Promise.resolve().then(async () => {
       // Nirgends ein Gerät aktiv: auf dieser Kachel abspielen (Player bei Bedarf anlegen, Befehl nachsetzen)
-      if (lazyTile && STARTS.indexOf(command) >= 0) debug('run ' + command + (retried ? ' (nachgesetzt)' : '') + ': aktiv=' + (state().deviceId || '-').slice(0, 8) + ' eigenes=' + (ownDeviceId() || '-').slice(0, 8));
       if (lazyTile && !retried && STARTS.indexOf(command) >= 0 && !state().deviceId && !ownDeviceId()) {
         emit('notice', T('Connecting this tile…'));
         if (await ensureTilePlayer()) return retry404(() => perform(command, args || {}));
@@ -512,14 +511,23 @@
     // Player schon da: nur die Geräte-ID gleich wieder bekanntgeben (die andere Ansicht hatte sie verworfen)
     hosting = ensureTilePlayer().catch(() => '').then(() => { hosting = null; });
   }
+  // Lebt eine andere Ansicht wirklich? Die App entlädt die kleine Kachel beim Vergrößern und die vergrößerte
+  // beim Schließen (gemessen 14.10.2026); ihr Eintrag bleibt bis 15 s stehen. Als lebend gilt nur, wer seit
+  // unserem Start weitergezählt hat.
+  const seenAtStart = {};
+  function aliveOthers() {
+    const all = views();
+    return Object.keys(all).filter(k => k !== viewId && Date.now() - (all[k].seen || 0) < 4000 && (seenAtStart[k] === undefined || all[k].seen > seenAtStart[k]));
+  }
   function oldestView() {
     const all = views();
-    return Object.keys(all).sort((a, b) => all[a].t - all[b].t)[0] || viewId;
+    const t = k => (all[k] ? all[k].t : startedAt);
+    return aliveOthers().concat([viewId]).sort((a, b) => t(a) - t(b))[0];
   }
   // Eine ältere Ansicht bitten, den Player anzulegen; die Antwort ist ihre Geräte-ID (sharedDevice)
   async function requestHost(to) {
     try { localStorage.setItem(HOST_KEY, to + '|' + Date.now()); } catch (e) { return ''; }
-    for (let i = 0; i < 60 && !sharedDevice(); i++) await sleep(200);
+    for (let i = 0; i < 60 && !sharedDevice() && aliveOthers().indexOf(to) >= 0; i++) await sleep(200);
     return sharedDevice();
   }
   window.addEventListener('storage', ev => { if (ev.key === HOST_KEY && ev.newValue) hostIfAsked(); });
@@ -564,6 +572,7 @@
   }
   async function ensureTilePlayerNow() {
     let id = !player ? sharedDevice() : '';
+    let created = false;
     debug('ensure: player=' + (player ? 'da' : 'nein') + ' shared=' + (id ? id.slice(0, 8) : '-') + ' Ansichten=' + Object.keys(views()).length + (oldestView() === viewId ? ' (ich älteste)' : ''));
     if (!id && !player) {
       const host = oldestView();
@@ -576,21 +585,49 @@
         id = sharedDevice();
       } else {
         await adoptPlayer(p);
+        created = true;
         emit('state');
       }
     }
     if (player) { id = await waitDeviceId(); heartbeat(); }
+    if (created) resumeHandover(id).catch(() => {});
     debug('ensure -> ' + (id ? id.slice(0, 8) : '-'));
     return id;
   }
   // Die älteste Ansicht legt den Player gleich an (Play soll sofort gehen); die anderen nutzen ihren
   function eagerTilePlayer() {
-    if (!lazyTile || player || sharedDevice() || oldestView() !== viewId) return;
+    if (!lazyTile || player || sharedDevice()) return;
+    // Ob die anderen Ansichten noch leben, zeigt sich erst nach ein paar Sekunden: dann noch einmal prüfen
+    if (!freshHandover() && oldestView() !== viewId) { setTimeout(eagerTilePlayer, 3000); return; }
     ensureTilePlayer().catch(() => {});
+  }
+  // Wiedergabe über das Entladen der Seite retten: Stand hinterlegen, die nächste Seite setzt ihn fort
+  const HANDOVER_KEY = SLOT + '_handover';
+  function freshHandover() {
+    try {
+      const note = JSON.parse(localStorage.getItem(HANDOVER_KEY) || 'null');
+      return note && Date.now() - (note.at || 0) < 20000 ? note : null;
+    } catch (e) { return null; }
+  }
+  function noteHandover() {
+    if (!player || !local || local.paused || !local.track_window || !local.track_window.current_track) return;
+    const t = local.track_window.current_track;
+    try {
+      localStorage.setItem(HANDOVER_KEY, JSON.stringify({ context: (local.context && local.context.uri) || '', uri: t.uri, position: local.position || 0, at: Date.now() }));
+    } catch (e) { /* egal */ }
+  }
+  async function resumeHandover(id) {
+    const note = freshHandover();
+    try { localStorage.removeItem(HANDOVER_KEY); } catch (e) { /* egal */ }
+    if (!note || !id || !/^spotify:track:[A-Za-z0-9]{22}$/.test(String(note.uri))) return;
+    const body = /^spotify:(album|playlist):[A-Za-z0-9]{22}$/.test(String(note.context)) ? { context_uri: note.context, offset: { uri: note.uri } } : { uris: [note.uri] };
+    body.position_ms = Math.max(0, Math.round((note.position || 0) + (Date.now() - note.at)));
+    try { await retry404(() => call('PUT', '/v1/me/player/play', { device_id: id }, body)); } catch (e) { debug('Weiterspielen: ' + errText(e)); }
   }
   // Player dieser Ansicht abmelden: pausiert im Hintergrund (force=false) oder beim Verlassen der Seite
   function dropTilePlayer(force) {
     if (!player || !lazyTile) return;
+    debug('drop ' + (force ? '(Seite verlassen)' : '(Hintergrund)') + ' spielt=' + (local && !local.paused ? 'ja' : 'nein'));
     if (!force && local && !local.paused) return;
     for (let i = bound.length - 1; i >= 0; i--) {
       if (bound[i][0] === player) { try { player.removeListener(bound[i][1], bound[i][2]); } catch (e) { /* egal */ } bound.splice(i, 1); }
@@ -622,7 +659,14 @@
       }
     }
     lazyTile = !host;
-    if (lazyTile) { heartbeat(); setInterval(heartbeat, 2000); setInterval(hostIfAsked, 300); eagerTilePlayer(); }
+    if (lazyTile) {
+      const all = views();
+      Object.keys(all).forEach(k => { seenAtStart[k] = all[k].seen || 0; });
+      heartbeat();
+      setInterval(heartbeat, 2000);
+      setInterval(hostIfAsked, 300);
+      eagerTilePlayer();
+    }
     // Chrome & Co. geben den Kopierschutz (Widevine) nur auf sicheren Seiten frei (https, localhost)
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
@@ -636,11 +680,11 @@
       setTimeout(() => {
         if (document.visibilityState !== 'hidden') return;
         const all = views();
-        const others = Object.keys(all).filter(k => k !== viewId && Date.now() - (all[k].seen || 0) < 4000);
-        if (!others.length) dropTilePlayer(false);
+        if (!aliveOthers().length) dropTilePlayer(false);
       }, 2500);
     });
-    window.addEventListener('pagehide', () => dropTilePlayer(true));
+    // Die App entlädt die Seite beim Vergrößern und Schließen: Stand hinterlegen, die nächste Seite spielt weiter
+    window.addEventListener('pagehide', () => { noteHandover(); dropTilePlayer(true); });
     report(true);
     // Lebenszeichen fürs Modul (es fragt dann selbst nicht ab): nur mit frischem Zustand, also sichtbar mit
     // gelungener eigener Abfrage oder mit spielendem SDK-Player (Ereignisse). Schlagen die Abfragen fehl
