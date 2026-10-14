@@ -233,7 +233,9 @@
     try { now = await call('GET', '/v1/me/player'); } catch (e) { forgetPlaying(); return; }
     if (now && now.device && now.is_playing && now.device.id !== note.device) { trace('keine Übernahme, es spielt ' + now.device.name); forgetPlaying(); return; }
     const body = /^spotify:(album|playlist):[A-Za-z0-9]{22}$/.test(String(note.context)) ? { context_uri: note.context, offset: { uri: note.uri } } : { uris: [note.uri] };
-    body.position_ms = Math.max(0, Math.round((note.position || 0) + age));
+    // Die alte Ansicht spielt nicht weiter: iOS friert eine verdeckte Kachel samt Ton ein, eine verworfene
+    // ist weg (gemessen 14.10.2026). Also dort fortsetzen, wo sie zuletzt war (höchstens 2 s nach dem Stand)
+    body.position_ms = Math.max(0, Math.round((note.position || 0) + Math.min(age, 2000)));
     trace('übernehme die Wiedergabe von [' + note.view + '] (' + Math.round(age / 1000) + ' s still)');
     for (let attempt = 0; attempt < 10; attempt++) {
       try { await call('PUT', '/v1/me/player/play', { device_id: slot().deviceId }, body); return; } catch (e) {
