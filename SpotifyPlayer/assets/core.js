@@ -316,7 +316,13 @@
         const id = args.id === TILE_ID ? await ensureTilePlayer() : args.id;
         if (!id) { const e = new Error(T('Spotify could not be loaded')); e.status = 0; throw e; }
         action('Device', id);
-        return call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false });
+        // Ein gerade angelegtes Gerät lehnt Spotify manchmal noch kurz ab: einmal nachsetzen
+        for (let attempt = 0; ; attempt++) {
+          try { return await call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false }); } catch (e) {
+            if (attempt > 0 || e.status !== 404 || args.id !== TILE_ID) throw e;
+            await sleep(2000);
+          }
+        }
       }
     }
     return Promise.resolve();
@@ -485,6 +491,18 @@
     for (let i = 0; i < 100 && !slot().deviceId; i++) await sleep(100);
     return slot().deviceId;
   }
+  // Spotify kennt ein neues Gerät erst kurz nach dem ready-Ereignis: ein Wechsel dorthin schlägt sonst
+  // mit 404 fehl. Warten, bis es in der Geräteliste steht (höchstens 10 s).
+  let registered = '';
+  async function waitRegistered(id) {
+    if (!id || registered === id) return !!id;
+    for (let i = 0; i < 10; i++) {
+      if ((await listDevices()).some(d => d && d.id === id)) { registered = id; return true; }
+      await sleep(1000);
+    }
+    debug('player ' + id.slice(0, 8) + ' nach 10 s nicht in der Geräteliste');
+    return false;
+  }
   // Sperre holen und Player bauen; null, wenn eine andere Ansicht sie hält (dann wird deren Player ferngesteuert)
   function acquireTilePlayer() {
     if (!navigator.locks) return loadPlayer().then(p => p, () => null);
@@ -500,17 +518,20 @@
   }
   // Geräte-ID des Players dieser Ansicht, bei Bedarf angelegt; sonst die einer anderen Ansicht; '' ohne Player
   async function ensureTilePlayer() {
-    if (player) return waitDeviceId();
-    if (sharedDevice()) return sharedDevice();
-    const p = await acquireTilePlayer();
-    if (!p) {
-      for (let i = 0; i < 50 && !sharedDevice(); i++) await sleep(100);
-      return sharedDevice();
+    if (!player && sharedDevice()) return sharedDevice();
+    if (!player) {
+      const p = await acquireTilePlayer();
+      if (!p) {
+        for (let i = 0; i < 50 && !sharedDevice(); i++) await sleep(100);
+        return sharedDevice();
+      }
+      await adoptPlayer(p);
+      shareDeviceId();
+      emit('state');
     }
-    await adoptPlayer(p);
-    shareDeviceId();
-    emit('state');
-    return waitDeviceId();
+    const id = await waitDeviceId();
+    await waitRegistered(id);
+    return id;
   }
   // Player dieser Ansicht abmelden: pausiert im Hintergrund (force=false) oder beim Verlassen der Seite
   function dropTilePlayer(force) {
