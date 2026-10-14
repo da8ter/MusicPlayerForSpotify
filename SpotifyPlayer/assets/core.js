@@ -139,6 +139,9 @@
   function bindPlayer() {
     on(player, 'player_state_changed', state => {
       const was = !!local && !local.paused;
+      // Nach einem Wechsel auf ein anderes Gerät meldet das SDK weiter einen pausierten Zustand; spielt laut
+      // Spotify ein anderes Gerät, gilt dieser Player als nicht aktiv
+      if (state && state.paused && remote && remote.device && remote.is_playing && remote.device.id !== slot().deviceId) state = null;
       local = state || null;
       if (was !== (!!local && !local.paused)) trace((local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht mehr aktiv') + ' (' + document.visibilityState + ')');
       if (!local || local.paused) forgetPlaying();
@@ -351,7 +354,16 @@
   }
 
   async function listDevices() {
-    try { return (await call('GET', '/v1/me/player/devices')).devices || []; } catch (e) { return []; }
+    let devices = [];
+    try { devices = (await call('GET', '/v1/me/player/devices')).devices || []; } catch (e) { return []; }
+    // Ist laut Liste ein anderes Gerät aktiv, ist der Zustand des eigenen Players veraltet: neu abfragen
+    if (local && devices.some(d => d && d.is_active && d.id !== slot().deviceId)) {
+      local = null;
+      slot().remoteAt = 0;
+      schedulePoll(0);
+      emit('state');
+    }
+    return devices;
   }
   // Geister: Geräte-IDs eigener Player, die sich beim Modul nicht mehr melden (Spotify listet sie noch
   // stundenlang). Antwort per Push; ohne Antwort binnen 1,5 s wird nichts ausgeblendet.
@@ -420,6 +432,7 @@
       case 'queue': return call('POST', '/v1/me/player/queue', Object.assign({ uri: args.uri }, deviceParam()));
       case 'transfer':
         forgetPlaying(true);
+        if (args.id !== slot().deviceId) local = null;
         action('Device', args.id);
         return call('PUT', '/v1/me/player', {}, { device_ids: [args.id], play: args.play !== false });
     }

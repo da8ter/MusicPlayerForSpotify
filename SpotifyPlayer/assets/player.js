@@ -231,9 +231,11 @@
     // Getrennte eigene Player (Geister) ausblenden, außer Spotify hält eins für aktiv
     const list = devices.filter(d => d && d.id && !d.is_restricted && (d.is_active || d.id === sdk || ghosts.indexOf(d.id) < 0));
     if (sdk && !list.some(d => d.id === sdk)) list.unshift({ id: sdk, name: T('This tile'), type: 'tile' });
+    // Aktiv ist, was Spotify als aktiv meldet; nur wenn die Liste keins nennt, das Gerät des Zustands
+    const listed = list.some(d => d.is_active);
     list.forEach(d => {
       const b = document.createElement('button');
-      const active = d.is_active || d.id === current.deviceId;
+      const active = listed ? !!d.is_active : d.id === current.deviceId;
       b.className = 'sheet-item device' + (active ? ' active' : '');
       b.innerHTML = svg(DEVICE_ICONS[d.type] || 'speaker') + '<span>' + esc(d.id === sdk ? T('This tile') : d.name) + (d.id === sdk && d.name && d.name !== T('This tile') ? '<small>' + esc(d.name) + '</small>' : '') + '</span>' + (active ? svg('check', 'check') : '');
       b.onclick = async () => {
