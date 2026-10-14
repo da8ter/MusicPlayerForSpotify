@@ -42,7 +42,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         'Rename playlist', 'Delete playlist', 'Remove from playlist', 'Removed from playlist', 'Playlist renamed', 'Playlist deleted',
         'Follow artist', 'Unfollow artist', 'Now following', 'Unfollowed', 'Could not switch the device', 'Playing on', 'Open in Spotify',
         'Spotify does not share this content with this app',
-        'Name this device', 'Save', 'Connecting this tile…', 'The new name applies after reloading the visualization', 'Leave empty for the automatic name',
+        'Name this device', 'Save', 'Connecting this tile…', 'Tap the tile to continue playback', 'The new name applies after reloading the visualization', 'Leave empty for the automatic name',
         'Playback needs a secure connection (https). Open the visualization via the Connect address.',
     ];
 

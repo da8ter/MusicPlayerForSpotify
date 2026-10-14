@@ -150,7 +150,18 @@
     on(player, 'account_error', () => { premiumMissing = true; emit('notice', T('Spotify Premium is required for playback')); });
     on(player, 'playback_error', e => emit('error', T('Playback failed') + ' (' + errText(e) + ')'));
     on(player, 'initialization_error', e => emit('error', T('Spotify could not be loaded') + ' (' + errText(e) + ')'));
+    // iOS lässt Ton nur nach einer Berührung zu: eine frisch geladene Seite (Vergrößern, Schließen) darf
+    // nicht von selbst weiterspielen. Dann beim nächsten Tippen fortsetzen.
+    on(player, 'autoplay_failed', () => { needsTap = true; emit('notice', T('Tap the tile to continue playback')); });
   }
+  // Jede Berührung schaltet den Ton des SDK-Players frei (activateElement muss im Tipp-Ereignis laufen)
+  let needsTap = false;
+  function unlockAudio() {
+    if (!player || typeof player.activateElement !== 'function') return;
+    try { player.activateElement(); } catch (e) { /* egal */ }
+    if (needsTap) { needsTap = false; player.resume().catch(() => {}); }
+  }
+  ['touchend', 'click'].forEach(name => document.addEventListener(name, unlockAudio, true));
 
   // ── Zustand: SDK-Player, wenn er das aktive Gerät ist, sonst das abgefragte Connect-Gerät ──
   const REPEAT_FROM_API = { off: 0, context: 1, track: 2 };
@@ -507,7 +518,6 @@
     try { [to, at] = String(localStorage.getItem(HOST_KEY) || '').split('|'); } catch (e) { return; }
     if (to !== viewId || Date.now() - Number(at) > 30000) return;
     try { localStorage.removeItem(HOST_KEY); } catch (e) { /* egal */ }
-    debug('Bitte einer anderen Ansicht; Player ' + (player ? 'da' : 'anlegen'));
     // Player schon da: nur die Geräte-ID gleich wieder bekanntgeben (die andere Ansicht hatte sie verworfen)
     hosting = ensureTilePlayer().catch(() => '').then(() => { hosting = null; });
   }
@@ -573,10 +583,9 @@
   async function ensureTilePlayerNow() {
     let id = !player ? sharedDevice() : '';
     let created = false;
-    debug('ensure: player=' + (player ? 'da' : 'nein') + ' shared=' + (id ? id.slice(0, 8) : '-') + ' Ansichten=' + Object.keys(views()).length + (oldestView() === viewId ? ' (ich älteste)' : ''));
     if (!id && !player) {
       const host = oldestView();
-      if (host !== viewId) { id = await requestHost(host); debug('Antwort: ' + (id ? id.slice(0, 8) : 'keine')); }
+      if (host !== viewId) id = await requestHost(host);
     }
     if (!id && !player) {
       const p = await acquireTilePlayer();
@@ -591,7 +600,6 @@
     }
     if (player) { id = await waitDeviceId(); heartbeat(); }
     if (created) resumeHandover(id).catch(() => {});
-    debug('ensure -> ' + (id ? id.slice(0, 8) : '-'));
     return id;
   }
   // Die älteste Ansicht legt den Player gleich an (Play soll sofort gehen); die anderen nutzen ihren
@@ -627,7 +635,6 @@
   // Player dieser Ansicht abmelden: pausiert im Hintergrund (force=false) oder beim Verlassen der Seite
   function dropTilePlayer(force) {
     if (!player || !lazyTile) return;
-    debug('drop ' + (force ? '(Seite verlassen)' : '(Hintergrund)') + ' spielt=' + (local && !local.paused ? 'ja' : 'nein'));
     if (!force && local && !local.paused) return;
     for (let i = bound.length - 1; i >= 0; i--) {
       if (bound[i][0] === player) { try { player.removeListener(bound[i][1], bound[i][2]); } catch (e) { /* egal */ } bound.splice(i, 1); }
