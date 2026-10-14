@@ -136,9 +136,7 @@
             "restore SpotifyPlayer.key or sign in again": "SpotifyPlayer.key wiederherstellen oder neu anmelden",
             "Stored sign-in cannot be decrypted (restore SpotifyPlayer.key or sign in again)": "Gespeicherte Anmeldung nicht entschlüsselbar (SpotifyPlayer.key wiederherstellen oder neu anmelden)",
             "Profile": "Profil",
-            "OK": "OK",
-            "Connecting this tile…": "Kachel wird verbunden …",
-            "Tap the tile to continue playback": "Zum Weiterspielen auf die Kachel tippen"
+            "OK": "OK"
         }
     }
 }

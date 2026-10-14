@@ -219,8 +219,7 @@
   async function pickDevice() {
     const sheet = document.getElementById('sheet');
     const devices = await AMP.devices();
-    // Ohne Player (Kachel in der App) steht „Diese Kachel“ als Platzhalter in der Liste; er legt den Player an
-    const sdk = AMP.sdkDevice() || (AMP.canPlayHere() ? AMP.TILE_ID : '');
+    const sdk = AMP.sdkDevice();
     const current = AMP.state();
     sheet.innerHTML = '';
     const box = document.createElement('div');
@@ -245,7 +244,7 @@
       box.appendChild(b);
     });
     if (!list.length) box.insertAdjacentHTML('beforeend', '<p class="empty">' + esc(T('No device available: open the tile in a browser or start Spotify on a device')) + '</p>');
-    if (AMP.canPlayHere()) {
+    if (AMP.hasPlayer()) {
       const rename = document.createElement('button');
       rename.className = 'sheet-item';
       rename.textContent = T('Name this device') + ' …';
