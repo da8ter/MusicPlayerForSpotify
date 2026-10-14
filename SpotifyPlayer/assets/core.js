@@ -153,6 +153,8 @@
   let dropped = false;
   function dropIdlePlayer() {
     if (!player || win !== window || (local && !local.paused)) return;
+    // local kann kurz nach einem Gerätewechsel fehlen: meldet Spotify dieses Gerät als spielend, verbunden lassen
+    if (remote && remote.is_playing && remote.device && remote.device.id === slot().deviceId) return;
     for (let i = bound.length - 1; i >= 0; i--) {
       if (bound[i][0] === player) { try { player.removeListener(bound[i][1], bound[i][2]); } catch (e) { /* egal */ } bound.splice(i, 1); }
     }
