@@ -492,6 +492,18 @@
       localStorage.setItem(VIEWS_KEY, JSON.stringify(all));
       if (player && slot().deviceId) localStorage.setItem(TILE_LOCK, slot().deviceId + '|' + now);
     } catch (e) { /* egal */ }
+    hostIfAsked();
+  }
+  // Bitte einer anderen Ansicht (HOST_KEY) annehmen: über das storage-Ereignis und zur Sicherheit alle 2 s
+  let hosting = null;
+  function hostIfAsked() {
+    if (!lazyTile || player || hosting) return;
+    let to = '', at = 0;
+    try { [to, at] = String(localStorage.getItem(HOST_KEY) || '').split('|'); } catch (e) { return; }
+    if (to !== viewId || Date.now() - Number(at) > 30000) return;
+    try { localStorage.removeItem(HOST_KEY); } catch (e) { /* egal */ }
+    debug('Player für eine andere Ansicht anlegen');
+    hosting = ensureTilePlayer().catch(() => '').then(() => { hosting = null; });
   }
   function oldestView() {
     const all = views();
@@ -500,14 +512,10 @@
   // Eine ältere Ansicht bitten, den Player anzulegen; die Antwort ist ihre Geräte-ID (sharedDevice)
   async function requestHost(to) {
     try { localStorage.setItem(HOST_KEY, to + '|' + Date.now()); } catch (e) { return ''; }
-    for (let i = 0; i < 40 && !sharedDevice(); i++) await sleep(200);
+    for (let i = 0; i < 60 && !sharedDevice(); i++) await sleep(200);
     return sharedDevice();
   }
-  window.addEventListener('storage', ev => {
-    if (ev.key !== HOST_KEY || !ev.newValue || !lazyTile) return;
-    const [to, at] = ev.newValue.split('|');
-    if (to === viewId && Date.now() - Number(at) < 30000) ensureTilePlayer().catch(() => {});
-  });
+  window.addEventListener('storage', ev => { if (ev.key === HOST_KEY && ev.newValue) hostIfAsked(); });
   async function adoptPlayer(p) {
     player = p;
     bindPlayer();
@@ -548,7 +556,9 @@
     let id = !player ? sharedDevice() : '';
     if (!id && !player) {
       const host = oldestView();
+      debug('Player gesucht: ' + Object.keys(views()).length + ' Ansichten, ' + (host === viewId ? 'ich bin die älteste' : 'ältere Ansicht gebeten'));
       if (host !== viewId) id = await requestHost(host);
+      if (host !== viewId) debug('Antwort der älteren Ansicht: ' + (id ? id.slice(0, 8) : 'keine'));
     }
     if (!id && !player) {
       const p = await acquireTilePlayer();
