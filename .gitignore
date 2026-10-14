@@ -1,3 +1,0 @@
-# Nur lokal: Projektgedächtnis für Claude Code und Tests (nicht auf GitHub, nicht im Module Store)
-/.claude/
-/tests/
