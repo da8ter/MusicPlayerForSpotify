@@ -461,10 +461,13 @@
   // andere Seite) den Player halten; die anderen steuern ihn über seine Geräte-ID fern.
   const TILE_ID = 'tile'; // Platzhalter in der Geräteauswahl, solange es den Player noch nicht gibt
   const TILE_LOCK = SLOT + '_tilePlayer';
+  const VIEWS_KEY = SLOT + '_views';
+  const HOST_KEY = SLOT + '_host';
   const SHARED_TTL = 90000;
   let lazyTile = false; // Player erst auf Wunsch (Kachelfenster ohne Hauptfenster)
   let releaseLock = null;
-  let shareTimer = 0;
+  const viewId = randomId();
+  const startedAt = Date.now();
   // Geräte-ID des Players einer anderen Ansicht; sie bestätigt sie alle 2 s, sonst gilt sie als tot
   function sharedDevice() {
     try {
@@ -474,13 +477,37 @@
   }
   const forgetShared = () => { try { localStorage.removeItem(TILE_LOCK); } catch (e) { /* egal */ } };
   const ownDeviceId = () => slot().deviceId || (!player ? sharedDevice() : '');
-  function shareDeviceId() {
-    clearInterval(shareTimer);
-    shareTimer = setInterval(() => {
-      const id = slot().deviceId;
-      if (id) { try { localStorage.setItem(TILE_LOCK, id + '|' + Date.now()); } catch (e) { /* egal */ } }
-    }, 2000);
+  // Welche Ansichten dieser Instanz leben? Jede trägt sich alle 2 s ein. Die älteste (die normale Kachel,
+  // nicht die später geöffnete vergrößerte) soll den Player halten: so läuft die Musik weiter, wenn die
+  // vergrößerte Ansicht geschlossen wird.
+  function views() {
+    try { return JSON.parse(localStorage.getItem(VIEWS_KEY) || '{}') || {}; } catch (e) { return {}; }
   }
+  function heartbeat() {
+    const now = Date.now();
+    const all = views();
+    Object.keys(all).forEach(k => { if (now - (all[k].seen || 0) > 15000) delete all[k]; });
+    all[viewId] = { t: startedAt, seen: now };
+    try {
+      localStorage.setItem(VIEWS_KEY, JSON.stringify(all));
+      if (player && slot().deviceId) localStorage.setItem(TILE_LOCK, slot().deviceId + '|' + now);
+    } catch (e) { /* egal */ }
+  }
+  function oldestView() {
+    const all = views();
+    return Object.keys(all).sort((a, b) => all[a].t - all[b].t)[0] || viewId;
+  }
+  // Eine ältere Ansicht bitten, den Player anzulegen; die Antwort ist ihre Geräte-ID (sharedDevice)
+  async function requestHost(to) {
+    try { localStorage.setItem(HOST_KEY, to + '|' + Date.now()); } catch (e) { return ''; }
+    for (let i = 0; i < 40 && !sharedDevice(); i++) await sleep(200);
+    return sharedDevice();
+  }
+  window.addEventListener('storage', ev => {
+    if (ev.key !== HOST_KEY || !ev.newValue || !lazyTile) return;
+    const [to, at] = ev.newValue.split('|');
+    if (to === viewId && Date.now() - Number(at) < 30000) ensureTilePlayer().catch(() => {});
+  });
   async function adoptPlayer(p) {
     player = p;
     bindPlayer();
@@ -518,18 +545,23 @@
   }
   // Geräte-ID des Players dieser Ansicht, bei Bedarf angelegt; sonst die einer anderen Ansicht; '' ohne Player
   async function ensureTilePlayer() {
-    if (!player && sharedDevice()) return sharedDevice();
-    if (!player) {
+    let id = !player ? sharedDevice() : '';
+    if (!id && !player) {
+      const host = oldestView();
+      if (host !== viewId) id = await requestHost(host);
+    }
+    if (!id && !player) {
       const p = await acquireTilePlayer();
       if (!p) {
         for (let i = 0; i < 50 && !sharedDevice(); i++) await sleep(100);
-        return sharedDevice();
+        id = sharedDevice();
+      } else {
+        await adoptPlayer(p);
+        heartbeat();
+        emit('state');
       }
-      await adoptPlayer(p);
-      shareDeviceId();
-      emit('state');
     }
-    const id = await waitDeviceId();
+    if (player) id = await waitDeviceId();
     await waitRegistered(id);
     return id;
   }
@@ -547,7 +579,6 @@
     s.player = null;
     s.deviceId = '';
     s.state = 'new';
-    clearInterval(shareTimer);
     forgetShared();
     if (releaseLock) { releaseLock(); releaseLock = null; }
     emit('state');
@@ -568,6 +599,7 @@
       }
     }
     lazyTile = !host;
+    if (lazyTile) { heartbeat(); setInterval(heartbeat, 2000); }
     // Chrome & Co. geben den Kopierschutz (Widevine) nur auf sicheren Seiten frei (https, localhost)
     if (!player && !window.isSecureContext && !/iPhone|iPad|iPod/.test(navigator.userAgent)) emit('notice', T('Playback needs a secure connection (https). Open the visualization via the Connect address.'));
     emit('ready');
