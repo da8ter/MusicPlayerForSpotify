@@ -59,6 +59,8 @@ Im Browser (Mac, Windows, Android) und in den Symcon-Apps ist die Kachel selbst 
 
 Über die Geräteauswahl zeigt und steuert die Kachel jedes Gerät, auf dem Spotify gerade spielt (Handy, Sonos, Echo, Fernseher …), und holt die Wiedergabe dorthin. Wo die Kachel nicht selbst abspielen kann, bleibt sie Fernbedienung.
 
+**Warum ein Lautsprecher fehlt:** Die Geräteliste kommt von Spotify (Web API), nicht aus dem Heimnetz. Viele Spotify-Connect-Lautsprecher (Sonos, Echo, Verstärker, Fernseher) findet die Spotify-App direkt im WLAN; beim Spotify-Konto und damit in dieser Liste erscheinen sie erst, nachdem einmal über die Spotify-App (bei Echo auch über Alexa) auf ihnen abgespielt wurde, und nach längerem Leerlauf verschwinden sie wieder. Manche Gerätemodelle lässt Spotify dort laut Doku ganz weg. Geräte, die Spotify als „eingeschränkt“ meldet (keine Fernsteuerung über die Web API), blendet die Kachel aus. Abhilfe: einmal in der Spotify-App auf dem Lautsprecher abspielen, danach steht er in der Kachel und lässt sich steuern. Das gilt für jedes Modul, das Spotify über die Web API steuert.
+
 <p><img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Laeuft%20gerade.png" alt="Musikplayer für Spotify — Läuft gerade" width="32%"> <img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Geraete.png" alt="Musikplayer für Spotify — Geräteauswahl" width="32%"> <img src="https://raw.githubusercontent.com/da8ter/images/main/MusicPlayerForSpotify%20Warteschlange.png" alt="Musikplayer für Spotify — Warteschlange" width="32%"></p>
 
 ### Skripte und Variablen
