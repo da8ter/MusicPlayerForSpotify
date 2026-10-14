@@ -208,6 +208,18 @@
         else window.AMPDetails.showArtist({ type: 'artist', id: f.id, name: f.name, uri: f.uri });
       } : null,
     })), '');
+    // Die Instanz kennt nur den Link: Cover bei Spotify nachladen (zwischengespeichert, in Vierergruppen)
+    const PATHS = { track: '/v1/tracks/', album: '/v1/albums/', playlist: '/v1/playlists/', artist: '/v1/artists/' };
+    const rows = Array.from(document.querySelectorAll('#panel .row'));
+    inBatches(AMP.cfg.favorites.map((f, i) => [f, rows[i]]), 4, async ([f, row]) => {
+      if (!row || !PATHS[f.type]) return;
+      try {
+        const full = await AMP.api(PATHS[f.type] + encodeURIComponent(f.id), f.type === 'playlist' ? { fields: 'images' } : {});
+        const url = AMP.artwork(f.type === 'track' ? full.album && full.album.images : full.images, 96);
+        const thumb = row.querySelector('.thumb');
+        if (url && thumb && row.isConnected) thumb.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
+      } catch (e) { /* bleibt ohne Cover */ }
+    });
   }
 
   window.AMPViews = {
