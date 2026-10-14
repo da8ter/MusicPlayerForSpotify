@@ -141,6 +141,7 @@
       const was = !!local && !local.paused;
       local = state || null;
       if (was !== (!!local && !local.paused)) trace((local ? (local.paused ? 'pausiert' : 'spielt') : 'nicht mehr aktiv') + ' (' + document.visibilityState + ')');
+      if (!local || local.paused) forgetPlaying();
       if (local) player.getVolume().then(v => { localVolume = Math.round(v * 100); }).catch(() => {});
       emit('state');
       report(false);
@@ -185,6 +186,53 @@
     emit('state');
     setTimeout(alive, 3000);
     setTimeout(() => trace('neu verbunden ' + slot().deviceId), 3000);
+  }
+
+  // Übergabe zwischen Ansichten: Die App verwirft eine Kachelansicht manchmal ganz ohne Ereignis (gemessen
+  // 14.10.2026: die spielende Ansicht verschwand beim Maximieren ohne hidden und pagehide, die Musik brach ab);
+  // andere Male bleibt sie verdeckt und spielt weiter. Die spielende Ansicht hinterlegt darum alle 2 s Titel
+  // und Stelle. Findet eine neue sichtbare Ansicht den Stand ohne frisches Lebenszeichen vor, spielt sie dort
+  // weiter. Spotify hat je Konto nur ein aktives Gerät, doppelt spielt also nie etwas.
+  const PLAYING_KEY = SLOT + '_playing';
+  function readPlaying() {
+    try { return JSON.parse(localStorage.getItem(PLAYING_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function forgetPlaying() {
+    const note = readPlaying();
+    if (note && note.view === VIEW) { try { localStorage.removeItem(PLAYING_KEY); } catch (e) { /* egal */ } }
+  }
+  async function notePlaying() {
+    if (!player || !local || local.paused) return;
+    let st = null;
+    try { st = await player.getCurrentState(); } catch (e) { return; }
+    const t = st && !st.paused && st.track_window && st.track_window.current_track;
+    if (!t) return;
+    try {
+      localStorage.setItem(PLAYING_KEY, JSON.stringify({ view: VIEW, uri: t.uri, context: (st.context && st.context.uri) || '', position: st.position || 0, at: Date.now() }));
+    } catch (e) { /* egal */ }
+  }
+  // In den ersten 20 s einer Ansicht: verstummt der hinterlegte Stand (älter als 5 s), hier weiterspielen
+  async function takeOver(startedAt) {
+    const note = readPlaying();
+    const age = note ? Date.now() - (note.at || 0) : 0;
+    if (Date.now() - startedAt > 20000) return;
+    if (!note || note.view === VIEW || age < 5000 || age > 30000 || !player || !slot().deviceId || document.visibilityState !== 'visible' || (local && !local.paused)) {
+      setTimeout(() => takeOver(startedAt), 1000);
+      return;
+    }
+    if (!/^spotify:track:[A-Za-z0-9]{22}$/.test(String(note.uri))) return;
+    // Sofort als eigenen Stand eintragen, damit keine weitere Ansicht ebenfalls übernimmt
+    try { localStorage.setItem(PLAYING_KEY, JSON.stringify(Object.assign({}, note, { view: VIEW, at: Date.now() }))); } catch (e) { /* egal */ }
+    const body = /^spotify:(album|playlist):[A-Za-z0-9]{22}$/.test(String(note.context)) ? { context_uri: note.context, offset: { uri: note.uri } } : { uris: [note.uri] };
+    body.position_ms = Math.max(0, Math.round((note.position || 0) + age));
+    trace('übernehme die Wiedergabe von [' + note.view + '] (' + Math.round(age / 1000) + ' s still)');
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try { await call('PUT', '/v1/me/player/play', { device_id: slot().deviceId }, body); return; } catch (e) {
+        if (e.status !== 404) { trace('Übernahme: ' + errText(e)); forgetPlaying(); return; }
+        await sleep(700);
+      }
+    }
+    forgetPlaying();
   }
 
   // ── Zustand: SDK-Player, wenn er das aktive Gerät ist, sonst das abgefragte Connect-Gerät ──
@@ -541,6 +589,7 @@
     setInterval(() => { if ((document.visibilityState === 'visible' && Date.now() - pollOkAt < 75000) || local) report(true); }, 30000);
     setTimeout(alive, 3000);
     setInterval(alive, 30000);
+    if (win === window) { setInterval(notePlaying, 2000); takeOver(Date.now()); }
   }
 
   window.AMP = {
