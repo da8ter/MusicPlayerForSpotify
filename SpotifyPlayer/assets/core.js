@@ -367,15 +367,26 @@
   }
 
   // Liefert true bei Erfolg; Fehler zeigt die Kachel als Hinweis.
-  function run(command, args) {
+  function run(command, args, attempt) {
+    attempt = attempt || 0;
     return Promise.resolve().then(() => perform(command, args || {})).then(() => {
       // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt
       slot().remoteAt = 0;
       commandAt = Date.now();
       schedulePoll(command === 'volume' ? 1500 : 600);
       return true;
-    }, e => {
-      if (e.reason === 'NO_ACTIVE_DEVICE' || e.status === 404) emit('error', T('No device available: open the tile in a browser or start Spotify on a device'));
+    }, async e => {
+      const noDevice = e.reason === 'NO_ACTIVE_DEVICE' || e.status === 404;
+      // Jede Ansicht in der App verbindet beim Öffnen einen neuen Player; Spotify kennt ihn erst ein paar
+      // Sekunden nach dem ready-Ereignis und antwortet bis dahin mit 404 (gemessen 14.10.2026). Befehle an
+      // den eigenen Player deshalb bis 7 s nachsetzen.
+      const target = command === 'transfer' ? args && args.id : state().deviceId || slot().deviceId;
+      if (noDevice && player && target && target === slot().deviceId && attempt < 10) {
+        if (!attempt) trace('404 an den eigenen Player, setze nach');
+        await sleep(700);
+        return run(command, args, attempt + 1);
+      }
+      if (noDevice) emit('error', T('No device available: open the tile in a browser or start Spotify on a device'));
       else if (e.reason === 'PREMIUM_REQUIRED') emit('error', T('Spotify Premium is required for playback'));
       else if (e.status !== 401) emit('error', T('Playback failed') + ' (' + errText(e) + ')');
       return false;
