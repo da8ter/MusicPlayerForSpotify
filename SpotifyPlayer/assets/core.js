@@ -197,9 +197,10 @@
   function readPlaying() {
     try { return JSON.parse(localStorage.getItem(PLAYING_KEY) || 'null'); } catch (e) { return null; }
   }
-  function forgetPlaying() {
+  // Eigenen Stand löschen; any: jeden (die Wiedergabe gehört jetzt einem anderen Gerät)
+  function forgetPlaying(any) {
     const note = readPlaying();
-    if (note && note.view === VIEW) { try { localStorage.removeItem(PLAYING_KEY); } catch (e) { /* egal */ } }
+    if (note && (any || note.view === VIEW)) { try { localStorage.removeItem(PLAYING_KEY); } catch (e) { /* egal */ } }
   }
   async function notePlaying() {
     if (!player || !local || local.paused) return;
@@ -208,7 +209,7 @@
     const t = st && !st.paused && st.track_window && st.track_window.current_track;
     if (!t) return;
     try {
-      localStorage.setItem(PLAYING_KEY, JSON.stringify({ view: VIEW, uri: t.uri, context: (st.context && st.context.uri) || '', position: st.position || 0, at: Date.now() }));
+      localStorage.setItem(PLAYING_KEY, JSON.stringify({ view: VIEW, device: slot().deviceId, uri: t.uri, context: (st.context && st.context.uri) || '', position: st.position || 0, at: Date.now() }));
     } catch (e) { /* egal */ }
   }
   // In den ersten 20 s einer Ansicht: verstummt der hinterlegte Stand (älter als 5 s), hier weiterspielen
@@ -222,7 +223,12 @@
     }
     if (!/^spotify:track:[A-Za-z0-9]{22}$/.test(String(note.uri))) return;
     // Sofort als eigenen Stand eintragen, damit keine weitere Ansicht ebenfalls übernimmt
-    try { localStorage.setItem(PLAYING_KEY, JSON.stringify(Object.assign({}, note, { view: VIEW, at: Date.now() }))); } catch (e) { /* egal */ }
+    try { localStorage.setItem(PLAYING_KEY, JSON.stringify(Object.assign({}, note, { view: VIEW, device: slot().deviceId, at: Date.now() }))); } catch (e) { /* egal */ }
+    // Nur übernehmen, wenn nichts spielt oder noch der verschwundene Player als aktiv gilt; spielt ein
+    // anderes Gerät (Mac, Lautsprecher), gehört die Wiedergabe ihm
+    let now = null;
+    try { now = await call('GET', '/v1/me/player'); } catch (e) { forgetPlaying(); return; }
+    if (now && now.device && now.is_playing && now.device.id !== note.device) { trace('keine Übernahme, es spielt ' + now.device.name); forgetPlaying(); return; }
     const body = /^spotify:(album|playlist):[A-Za-z0-9]{22}$/.test(String(note.context)) ? { context_uri: note.context, offset: { uri: note.uri } } : { uris: [note.uri] };
     body.position_ms = Math.max(0, Math.round((note.position || 0) + age));
     trace('übernehme die Wiedergabe von [' + note.view + '] (' + Math.round(age / 1000) + ' s still)');
@@ -317,8 +323,9 @@
         s.remoteJson = JSON.stringify(remote);
         s.remoteAt = remoteAt;
       }
-      // Spielt ein anderes Gerät, ist der SDK-Zustand veraltet
+      // Spielt ein anderes Gerät, ist der SDK-Zustand veraltet und kein Stand mehr zu übernehmen
       if (remote && remote.device.id !== slot().deviceId) local = null;
+      if (remote && remote.is_playing) { const note = readPlaying(); if (note && note.device !== remote.device.id) forgetPlaying(true); }
       pollOkAt = Date.now();
       emit('state');
       report(false);
@@ -412,6 +419,7 @@
       case 'playUris': return call('PUT', '/v1/me/player/play', deviceParam(), { uris: args.uris });
       case 'queue': return call('POST', '/v1/me/player/queue', Object.assign({ uri: args.uri }, deviceParam()));
       case 'transfer':
+        forgetPlaying(true);
         action('Device', args.id);
         return call('PUT', '/v1/me/player', {}, { device_ids: [args.id], play: args.play !== false });
     }
