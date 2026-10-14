@@ -78,7 +78,6 @@ Sie steuern immer das aktive Gerät; ohne aktives Gerät die Kachel im Browser o
 
 - Das Modul erneuert das Access-Token selbst (Spotify-Token gelten eine Stunde).
 - Die Anmeldung endet über **Abmelden**, wenn Spotify sie widerruft, oder nach spätestens sechs Monaten (so lange gelten Spotifys Refresh-Token seit Juli 2026). Dann zeigt die Kachel wieder **Mit Spotify anmelden**.
-- **Umstieg von einer eigenen Spotify-App (Client ID):** Nach dem Update ist die Instanz abgemeldet, einmal neu anmelden genügt. Die App bei Spotify kann danach gelöscht werden.
 
 ## Variablen
 
