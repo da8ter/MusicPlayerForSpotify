@@ -110,8 +110,8 @@ html:not(.wide) .page-title, html:not(.wide) .album-head .txt { padding-right: 4
 }
 html.wide .mini { left: calc(var(--marginside, 12px) + var(--side-w) + 16px); bottom: calc(var(--tab-gap) + var(--marginbottom, 12px)); max-width: 640px; }
 html.no-mini .mini { display: none; }
-/* Zeitleiste des laufenden Titels: dünn am unteren Rand der Kapsel, innerhalb der Rundung */
-.mini-time { position: absolute; left: 26px; right: 26px; bottom: 6px; height: 3px; border-radius: 2px; overflow: hidden; pointer-events: none; background: color-mix(in srgb, currentColor 18%, transparent); }
+/* Zeitleiste des laufenden Titels: dünn am unteren Rand der Kapsel, beginnt bündig mit dem Titel (Rand 8 + Cover 42 + Abstand 10) */
+.mini-time { position: absolute; left: 60px; right: 26px; bottom: 6px; height: 3px; border-radius: 2px; overflow: hidden; pointer-events: none; background: color-mix(in srgb, currentColor 18%, transparent); }
 .mini-time i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 1s linear; }
 .mini-cover { flex: none; width: 42px; height: 42px; border-radius: 50%; background: var(--surface) center / cover no-repeat; }
 .mini-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
