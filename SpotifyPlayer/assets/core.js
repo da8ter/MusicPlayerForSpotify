@@ -409,6 +409,8 @@
         await sleep(700);
         return run(command, args, attempt + 1);
       }
+      // Spotifys Antwort ins Debug der Instanz: die Kachel zeigt nur einen allgemeinen Hinweis
+      debug('Befehl ' + command + (command === 'transfer' && args ? ' an ' + args.id : '') + ' fehlgeschlagen: ' + (e.status || '') + ' ' + errText(e));
       if (noDevice) emit('error', T('No device available: open the tile in a browser or start Spotify on a device'));
       else if (e.reason === 'PREMIUM_REQUIRED') emit('error', T('Spotify Premium is required for playback'));
       else if (e.status !== 401) emit('error', T('Playback failed') + ' (' + errText(e) + ')');
