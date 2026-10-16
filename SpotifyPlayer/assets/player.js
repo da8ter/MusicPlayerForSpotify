@@ -242,7 +242,7 @@
       b.onclick = async () => {
         sheet.hidden = true;
         if (active) return;
-        if (!(await AMP.run('transfer', { id: d.id, play: current.playing || !current.item }))) notice(T('Could not switch the device'));
+        if (!(await AMP.run('transfer', { id: d.id, play: current.playing || !current.item, name: d.name, type: d.type }))) notice(T('Could not switch the device'));
         else notice(T('Playing on') + ' ' + (d.id === sdk ? T('This tile') : d.name));
       };
       box.appendChild(b);

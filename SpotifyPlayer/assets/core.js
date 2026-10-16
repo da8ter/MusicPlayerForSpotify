@@ -381,10 +381,28 @@
         if (!id) { const e = new Error(T('Spotify could not be loaded')); e.status = 0; throw e; }
         if (id !== slot().deviceId) local = null;
         action('Device', id);
-        return call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false });
+        await call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false });
+        // Anzeige gleich auf das neue Gerät stellen; confirmDevice gleicht danach mit Spotify ab
+        if (remote && remote.device && id !== slot().deviceId) {
+          remote = Object.assign({}, remote, { device: Object.assign({}, remote.device, { id, name: args.name || remote.device.name, type: args.type || remote.device.type, is_active: true }) });
+          remoteAt = Date.now();
+        }
+        return id;
       }
     }
     return Promise.resolve();
+  }
+
+  // Nach einem Gerätewechsel nachfragen, bis Spotify das neue Gerät meldet (höchstens 8 s); Spotify braucht
+  // dafür oft ein, zwei Sekunden, eine einzelne Abfrage sähe noch das alte Gerät
+  async function confirmDevice(id) {
+    for (let i = 0; i < 10; i++) {
+      await sleep(i ? 800 : 500);
+      slot().remoteAt = 0;
+      await poll();
+      if ((remote && remote.device && remote.device.id === id) || (local && id === slot().deviceId)) break;
+    }
+    schedulePoll(nextPoll());
   }
 
   // Liefert true bei Erfolg; Fehler zeigt die Kachel als Hinweis.
@@ -394,11 +412,11 @@
       // Läuft nirgends etwas, spielt Play auf dieser Kachel: Player in der App erst jetzt anlegen
       if (lazyTile && !player && !attempt && STARTS.indexOf(command) >= 0 && !state().deviceId) await ensureTilePlayer();
       return perform(command, args || {});
-    }).then(() => {
+    }).then(result => {
       // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt
       slot().remoteAt = 0;
       commandAt = Date.now();
-      schedulePoll(command === 'volume' ? 1500 : 600);
+      if (command === 'transfer' && typeof result === 'string') { emit('state'); confirmDevice(result); } else schedulePoll(command === 'volume' ? 1500 : 600);
       return true;
     }, async e => {
       const noDevice = e.reason === 'NO_ACTIVE_DEVICE' || e.status === 404;
