@@ -173,7 +173,14 @@
     $('tDur').textContent = '-' + fmt(Math.max(0, s.duration - position) / 1000);
     $('seek').value = s.duration ? Math.round(position / s.duration * 1000) : 0;
     setFill($('seek'));
+    // Mini-Player: Zeitleiste; beim Titelwechsel ohne Übergang zurück an den Anfang
+    const bar = $('miniTime');
+    const ratio = s.duration ? Math.min(1, position / s.duration) : 0;
+    bar.style.transition = ratio < lastRatio ? 'none' : '';
+    bar.style.transform = 'scaleX(' + ratio.toFixed(4) + ')';
+    lastRatio = ratio;
   }
+  let lastRatio = 0;
 
   // ── Warteschlange: „Als Nächstes“ mit Zufall und Wiederholen im Kopf (Spotify liefert sie nur lesend) ──
   let queueBusy = false;
