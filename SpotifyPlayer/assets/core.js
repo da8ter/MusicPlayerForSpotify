@@ -382,7 +382,7 @@
         if (id !== slot().deviceId) local = null;
         action('Device', id);
         await call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false });
-        // Anzeige gleich auf das neue Gerät stellen; confirmDevice gleicht danach mit Spotify ab
+        // Anzeige gleich auf das neue Gerät stellen; confirm gleicht danach mit Spotify ab
         if (remote && remote.device && id !== slot().deviceId) {
           remote = Object.assign({}, remote, { device: Object.assign({}, remote.device, { id, name: args.name || remote.device.name, type: args.type || remote.device.type, is_active: true }) });
           remoteAt = Date.now();
@@ -393,30 +393,51 @@
     return Promise.resolve();
   }
 
-  // Nach einem Gerätewechsel nachfragen, bis Spotify das neue Gerät meldet (höchstens 8 s); Spotify braucht
-  // dafür oft ein, zwei Sekunden, eine einzelne Abfrage sähe noch das alte Gerät
-  async function confirmDevice(id) {
-    for (let i = 0; i < 10; i++) {
+  // Nach einem Befehl an ein anderes Gerät nachfragen, bis Spotify die Änderung meldet (höchstens 8 s). Spotify
+  // braucht dafür oft ein, zwei Sekunden; eine einzelne Abfrage sähe noch den alten Titel bzw. das alte Gerät.
+  // Ein neuer Befehl löst die laufende Nachfrage ab.
+  let confirmRun = 0;
+  async function confirm(done) {
+    const run = ++confirmRun;
+    for (let i = 0; i < 10 && run === confirmRun; i++) {
       await sleep(i ? 800 : 500);
       slot().remoteAt = 0;
       await poll();
-      if ((remote && remote.device && remote.device.id === id) || (local && id === slot().deviceId)) break;
+      if (done()) break;
     }
-    schedulePoll(nextPoll());
+    if (run === confirmRun) schedulePoll(nextPoll());
+  }
+  // Woran die Kachel erkennt, dass der Befehl angekommen ist (null: nur einmal kurz danach abfragen)
+  function confirmCheck(command, args, before, result) {
+    const now = () => liveState();
+    switch (command) {
+      case 'transfer': return () => (remote && remote.device && remote.device.id === result) || (!!local && result === slot().deviceId);
+      case 'playItem': return () => { const c = now(); return !!c.item && (args.type === 'track' ? c.item.id === args.id : c.context === 'spotify:' + args.type + ':' + args.id); };
+      case 'playUris': case 'next': case 'previous': return () => { const c = now(); return !!c.item && c.item.id !== before.itemId; };
+      case 'play': return () => now().playing;
+      case 'pause': return () => !now().playing;
+    }
+    return null;
   }
 
   // Liefert true bei Erfolg; Fehler zeigt die Kachel als Hinweis.
   function run(command, args, attempt) {
     attempt = attempt || 0;
+    let before = { itemId: '', local: false };
     return Promise.resolve().then(async () => {
       // Läuft nirgends etwas, spielt Play auf dieser Kachel: Player in der App erst jetzt anlegen
       if (lazyTile && !player && !attempt && STARTS.indexOf(command) >= 0 && !state().deviceId) await ensureTilePlayer();
+      const c = state();
+      before = { itemId: c.item ? c.item.id : '', local: !!(player && c.local && local) };
       return perform(command, args || {});
     }).then(result => {
-      // Zustand bald nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt
+      // Zustand nachziehen (die Web API meldet Änderungen nicht von selbst); das geteilte Ergebnis ist jetzt alt.
+      // Spielt die Kachel selbst, melden die SDK-Ereignisse die Änderung sofort.
       slot().remoteAt = 0;
       commandAt = Date.now();
-      if (command === 'transfer' && typeof result === 'string') { emit('state'); confirmDevice(result); } else schedulePoll(command === 'volume' ? 1500 : 600);
+      if (command === 'transfer') emit('state');
+      const check = (command === 'transfer' || !before.local) && confirmCheck(command, args || {}, before, result);
+      if (check) confirm(check); else schedulePoll(command === 'volume' ? 1500 : 600);
       return true;
     }, async e => {
       const noDevice = e.reason === 'NO_ACTIVE_DEVICE' || e.status === 404;
