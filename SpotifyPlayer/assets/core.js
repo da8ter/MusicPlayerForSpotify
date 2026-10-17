@@ -381,7 +381,13 @@
         if (!id) { const e = new Error(T('Spotify could not be loaded')); e.status = 0; throw e; }
         if (id !== slot().deviceId) local = null;
         action('Device', id);
-        await call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false });
+        // Eingeschlafene Echos meldet Spotify mit 404, bis sie aufwachen: bis zu dreimal nachsetzen
+        for (let attempt = 0; ; attempt++) {
+          try { await call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false }); break; } catch (e) {
+            if (e.status !== 404 || attempt >= 3) throw e;
+            await sleep(1500);
+          }
+        }
         // Anzeige gleich auf das neue Gerät stellen; confirm gleicht danach mit Spotify ab
         if (remote && remote.device && id !== slot().deviceId) {
           remote = Object.assign({}, remote, { device: Object.assign({}, remote.device, { id, name: args.name || remote.device.name, type: args.type || remote.device.type, is_active: true }) });

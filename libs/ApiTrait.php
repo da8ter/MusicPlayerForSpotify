@@ -10,6 +10,9 @@ trait MusicPlayerSpotifyApiTrait
 {
     // Eine Gerätewahl gilt nur für den Wechsel, danach zählt wieder das aktive Gerät
     private const WANTED_DEVICE_TTL = 60;
+    // Gerätewechsel auf ein eingeschlafenes Gerät (Echo): 404, bis es aufwacht; so oft und so lange nachsetzen
+    private const TRANSFER_RETRIES = 3;
+    private const TRANSFER_RETRY_MS = 1500;
     // Kachel-Player melden sich alle 30 s (Player); ohne Meldung seit 3 min gilt ihre Geräte-ID als Geist
     private const PLAYER_ALIVE = 180;
     private const PLAYER_KEEP = 86400;
@@ -247,7 +250,18 @@ trait MusicPlayerSpotifyApiTrait
                 if ($Device === '') {
                     throw new RuntimeException('HTTP 404');
                 }
-                $this->Api('PUT', '/v1/me/player', [], ['device_ids' => [$Device], 'play' => true]);
+                // Eingeschlafene Echos meldet Spotify mit 404, bis sie aufwachen: bis zu dreimal nachsetzen
+                for ($attempt = 0; ; $attempt++) {
+                    try {
+                        $this->Api('PUT', '/v1/me/player', [], ['device_ids' => [$Device], 'play' => true]);
+                        break;
+                    } catch (RuntimeException $e) {
+                        if ($attempt >= self::TRANSFER_RETRIES || !str_starts_with($e->getMessage(), 'HTTP 404')) {
+                            throw $e;
+                        }
+                        IPS_Sleep(self::TRANSFER_RETRY_MS);
+                    }
+                }
                 break;
             default: throw new InvalidArgumentException('Invalid command ' . $Command);
         }
