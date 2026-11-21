@@ -55,6 +55,14 @@ Im Browser (Mac, Windows, Android) und in den Symcon-Apps ist die Kachel selbst 
 - **Läuft weiter:** Der Player bleibt im Fenster der Visualisierung, auch wenn du die Kategorie wechselst.
 - **Symcon-Apps (iPhone, iPad, Android):** Die Kachel wird erst zum Gerät, wenn du auf ihr abspielst: über *Geräte → Diese Kachel* oder mit Play, solange nirgends etwas läuft. Die Apps bauen eine Kachel beim Maximieren, Verkleinern und beim Wechsel der Kategorie neu auf; die Wiedergabe auf der Kachel stoppt dann, und die Kachel meldet sich bei Spotify ab. So entsteht kein Geräteeintrag je Ansicht. Für Musik, die weiterläuft, wähle ein anderes Gerät, etwa die Spotify-App auf demselben Telefon (einmal öffnen, damit sie in der Liste erscheint).
 
+### Ohne die Kachel zu öffnen (Visu-Erweiterung)
+
+Mit der Browser-Erweiterung [Visu-Erweiterung für Symcon](https://github.com/da8ter/VisuExtensionForSymcon) geht mehr. Verbindet die Instanz dazu mit der Instanz „Visu-Erweiterung“ (in der Instanz „Gateway ändern“).
+
+- **Spotify-Connect-Gerät ohne Kachel:** Jeder dort gekoppelte Browser lädt den Player gleich beim Öffnen der Visualisierung, auch wenn die Player-Kachel noch nie angezeigt wurde. Auf welchen Geräten das geschieht, legt ihr in der Visu-Erweiterung fest („Welches Modul läuft auf welchem Gerät“).
+- **Mini-Player (optional):** Mit „Mini-Player über der Visualisierung“ erscheint ein kleiner Player mit Cover, Titel und Zurück / Wiedergabe / Weiter, sobald ihr die Seite mit der Kachel verlasst. Er lässt sich mit Finger oder Maus frei verschieben, der Browser merkt sich die Stelle. Ein Tipp aufs Cover führt zurück zur Kachel, das × blendet ihn bis zum nächsten Titel aus.
+- **Erst einmal berühren:** Browser spielen Ton erst ab, nachdem jemand die Seite einmal berührt oder angeklickt hat. Danach lässt sich die Wiedergabe aus Symcon starten. Ein Kiosk-Chrome kann die Sperre mit dem Startschalter `--autoplay-policy=no-user-gesture-required` aufheben.
+
 ### Andere Geräte
 
 Über die Geräteauswahl zeigt und steuert die Kachel jedes Gerät, auf dem Spotify gerade spielt (Handy, Sonos, Echo, Fernseher …), und holt die Wiedergabe dorthin. Wo die Kachel nicht selbst abspielen kann, bleibt sie Fernbedienung.

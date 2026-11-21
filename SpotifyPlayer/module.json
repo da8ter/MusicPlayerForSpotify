@@ -4,9 +4,9 @@
     "type": 3,
     "vendor": "",
     "aliases": [],
-    "parentRequirements": [],
+    "parentRequirements": ["{A5B87602-1C34-4981-89A5-62A0735CB359}"],
     "childRequirements": [],
-    "implemented": [],
+    "implemented": ["{9E7FA1CF-55F3-418B-8C92-FF4BAAC93EFA}"],
     "prefix": "SPM",
     "url": "https://github.com/da8ter/MusicPlayerForSpotify/blob/main/SpotifyPlayer/README.md"
 }

@@ -9,9 +9,6 @@
   const cfg = window.SPM_CONFIG || {};
   // Ein Slot je Instanz: zwei Instanzen (zwei Spotify-Konten) auf einer Seite teilen weder Player noch Token
   const SLOT = '__symconSpotifyPlayer' + (/^\d+$/.test(String(cfg.instance || '')) ? '_' + cfg.instance : '');
-  // Das SDK-Skript gibt es je Fenster nur einmal, auch für mehrere Instanzen
-  const SDK_FLAG = '__symconSpotifySdk';
-  const SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
   const ITEM_TYPES = ['track', 'album', 'playlist', 'artist'];
   const listeners = [];
   const bound = [];
@@ -72,66 +69,12 @@
   }
   window.addEventListener('pagehide', unbindAll);
 
-  // spotify-player.js laden; der Bereit-Rückruf gehört dem Player-Fenster (keine Kachel-Funktion)
-  function inject(s) {
-    s.state = 'loading';
-    s.loadingSince = Date.now();
-    if (win.Spotify && win.Spotify.Player) win[SDK_FLAG] = 'ready';
-    if (win[SDK_FLAG] === 'ready' || (win[SDK_FLAG] === 'loading' && Date.now() - (win[SDK_FLAG + 'Since'] || 0) < 15000)) return;
-    win[SDK_FLAG] = 'loading';
-    win[SDK_FLAG + 'Since'] = Date.now();
-    win.onSpotifyWebPlaybackSDKReady = new win.Function('window["' + SDK_FLAG + '"] = "ready";');
-    const el = win.document.createElement('script');
-    el.src = SDK_URL;
-    el.async = true;
-    on(el, 'error', () => { s.state = 'error'; s.error = 'script'; win[SDK_FLAG] = ''; });
-    win.document.head.appendChild(el);
-  }
-
-  async function loadPlayer() {
-    const s = slot();
-    s.token = web.token();
-    if (s.state === 'error') s.state = 'new';
-    if (s.state === 'new') inject(s);
-    for (let i = 0; i < 300; i++) {
-      if (s.state === 'ready') return s.player;
-      // Die Kachel, die den Player einrichtet, kann mitten im Verbinden verworfen werden (Kategoriewechsel):
-      // dann läuft ihre Fortsetzung nie. Nach 20 s übernimmt eine andere Kachel und trennt den halben Player.
-      if (s.state === 'configuring' && Date.now() - (s.configuringSince || 0) > 20000) {
-        if (s.pending) { try { s.pending.disconnect(); } catch (e) { /* egal */ } s.pending = null; }
-        s.state = 'loading';
-      }
-      if (s.state === 'error') throw new Error(s.error);
-      if (s.state === 'loading' && win[SDK_FLAG] === 'ready' && win.Spotify && win.Spotify.Player) {
-        s.state = 'configuring';
-        const since = s.configuringSince = Date.now();
-        // Von einer anderen Kachel übernommen (siehe oben): dieses Ergebnis verwerfen
-        const superseded = () => s.state !== 'configuring' || s.configuringSince !== since;
-        try {
-          const options = new win.Object();
-          options.name = window.AMPPlayer ? await window.AMPPlayer.deviceName() : (cfg.playerName || 'Symcon');
-          s.deviceName = options.name;
-          options.volume = 0.5;
-          // Token-Rückruf und Geräte-ID gehören dem Player-Fenster: das SDK hält keine Kachel fest
-          options.getOAuthToken = new win.Function('cb', 'cb(window["' + SLOT + '"].token);');
-          const p = new win.Spotify.Player(options);
-          s.pending = p;
-          p.addListener('ready', new win.Function('e', 'window["' + SLOT + '"].deviceId = e.device_id;'));
-          p.addListener('not_ready', new win.Function('e', 'var s = window["' + SLOT + '"]; if (s.deviceId === e.device_id) s.deviceId = "";'));
-          p.addListener('account_error', new win.Function('e', 'window["' + SLOT + '"].accountError = true;'));
-          if (!(await p.connect())) throw new Error('connect');
-          if (superseded()) { try { p.disconnect(); } catch (e) { /* egal */ } continue; }
-          s.pending = null;
-          s.player = p;
-          s.state = 'ready';
-        } catch (e) { if (!superseded()) { s.state = 'error'; s.error = errText(e); } }
-        continue;
-      }
-      if (s.state === 'loading' && !win.Spotify && Date.now() - (s.loadingSince || 0) > 15000) inject(s);
-      await sleep(100);
-    }
-    throw new Error('timeout');
-  }
+  // SDK laden und Player verbinden: sdkhost.js (gemeinsam mit dem Player ohne Kachel aus der Browser-Erweiterung)
+  const sdk = window.AMPSdkHost({
+    win: () => win, slotName: SLOT, slot, token: () => web.token(), on, sleep, errText,
+    deviceName: async () => (window.AMPPlayer ? await window.AMPPlayer.deviceName() : (cfg.playerName || 'Symcon')),
+  });
+  const loadPlayer = sdk.loadPlayer;
 
   function bindPlayer() {
     on(player, 'player_state_changed', state => {
@@ -568,6 +511,16 @@
 
   async function start() {
     if (cfg.mode !== 'player') { emit('ready'); return; }
+    // Lebenszeichen der sichtbaren Kachel im Hauptfenster: Der Mini-Player der Browser-Erweiterung (mini.js)
+    // erscheint erst, wenn es ausbleibt, also die Seite mit der Kachel verlassen ist.
+    const markTile = () => {
+      if (!host || document.visibilityState !== 'visible' || !window.innerWidth || !window.innerHeight) return;
+      const s = slot();
+      s.tileAt = Date.now();
+      try { s.tilePage = (win.location.pathname + win.location.hash).slice(0, 200); } catch (e) { /* egal */ }
+    };
+    markTile();
+    setInterval(markTile, 1000);
     slot().token = web.token();
     // SDK-Player: im Hauptfenster gleich beim Laden (überlebt Kategoriewechsel); ohne Hauptfenster (Apps)
     // erst auf Wunsch, siehe ensureTilePlayer; ohne SDK nur Fernsteuerung

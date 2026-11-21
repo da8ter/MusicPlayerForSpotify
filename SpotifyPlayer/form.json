@@ -21,6 +21,11 @@
             "caption": "Without playback at most every 60 s. While a tile is open, it reports the state itself and the instance does not query."
         },
         {
+            "type": "CheckBox",
+            "name": "MiniPlayer",
+            "caption": "Mini player on top of the visualization when the page with the tile is left (needs the Visu Extension)"
+        },
+        {
             "type": "List",
             "name": "Favorites",
             "caption": "Favorites (open.spotify.com links to playlists, albums, songs or artists)",

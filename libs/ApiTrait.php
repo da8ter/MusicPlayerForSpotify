@@ -192,6 +192,7 @@ trait MusicPlayerSpotifyApiTrait
         $this->SetIfChanged('Shuffle', ($State['shuffle_state'] ?? false) === true);
         $this->SetIfChanged('Repeat', self::REPEAT_FROM_SPOTIFY[(string) ($State['repeat_state'] ?? 'off')] ?? 0);
         $this->SetIfChanged('Device', mb_substr((string) ($device['name'] ?? ''), 0, 60));
+        $this->DockState();
     }
 
     /**

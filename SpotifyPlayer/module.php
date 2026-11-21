@@ -7,6 +7,7 @@ require_once __DIR__ . '/../libs/SpotifyLink.php';
 require_once __DIR__ . '/../libs/AuthTrait.php';
 require_once __DIR__ . '/../libs/ApiTrait.php';
 require_once __DIR__ . '/../libs/VariablesTrait.php';
+require_once __DIR__ . '/../libs/DockTrait.php';
 
 /**
  * Musikplayer für Spotify als Kachel: das Web Playback SDK spielt im Browser (im Visu-Hauptfenster,
@@ -19,6 +20,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     use MusicPlayerSpotifyAuthTrait;
     use MusicPlayerSpotifyApiTrait;
     use MusicPlayerSpotifyVariablesTrait;
+    use MusicPlayerSpotifyDockTrait;
 
     private const STATUS_NO_CONNECT = 201;
     private const STATUS_SIGNED_OUT = 202;
@@ -53,6 +55,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->RegisterPropertyString('PlayerName', 'Symcon');
         $this->RegisterPropertyInteger('PollInterval', 30);
         $this->RegisterPropertyString('Favorites', '[]');
+        $this->RegisterPropertyBoolean('MiniPlayer', false);
 
         $this->RegisterAttributeString('RefreshSecret', '');
         $this->RegisterAttributeString('AccessSecret', '');
@@ -84,6 +87,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         }
 
         $this->RegisterVariables();
+        $this->SetReceiveDataFilter('.*"Target":(0|' . $this->InstanceID . ')[,}].*');
         $this->MigrateOwnApp();
         $this->ApplySignedIn();
 
@@ -160,6 +164,10 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             }
         }
         unset($action);
+        // Player ohne Kachel und Mini-Player laufen über die Instanz „Visu-Erweiterung“ (Browser-Erweiterung)
+        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate($this->Docked()
+            ? 'Docked onto the Visu Extension: paired browsers are available as a playback device as soon as the visualization is loaded.'
+            : 'Not connected to an instance "Visu Extension" (change gateway). With it, browsers are available as a playback device without opening the tile.')];
         return json_encode($form);
     }
 
@@ -186,6 +194,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             '/*STYLE*/'      => file_get_contents(__DIR__ . '/assets/player.css') . "\n" . file_get_contents(__DIR__ . '/assets/layout.css'),
             '/*CONFIG*/null' => json_encode($config, $flags),
             '/*WEBAPI*/'     => (string) file_get_contents(__DIR__ . '/assets/webapi.js'),
+            '/*SDKHOST*/'    => (string) file_get_contents(__DIR__ . '/assets/sdkhost.js'),
             '/*CORE*/'       => (string) file_get_contents(__DIR__ . '/assets/core.js'),
             '/*ICONS*/'      => (string) file_get_contents(__DIR__ . '/assets/icons.js'),
             '/*NAV*/'        => (string) file_get_contents(__DIR__ . '/assets/nav.js'),
@@ -455,6 +464,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->SetIfChanged('Shuffle', ($state['shuffle'] ?? false) === true);
         $this->SetIfChanged('Repeat', max(0, min(2, (int) ($state['repeat'] ?? 0))));
         $this->SetIfChanged('Device', $text($state['device'] ?? '', 60));
+        $this->DockState();
         $deviceId = $text($state['deviceId'] ?? '', 80);
         // Das SDK-Gerät der Kachel: Rückfall für Befehle, wenn kein Gerät aktiv ist
         if (($state['local'] ?? false) === true && preg_match('/^[A-Za-z0-9_-]{1,80}$/', $deviceId)) {
@@ -469,6 +479,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             $this->SetIfChanged($ident, '');
         }
         $this->SetIfChanged('Playback', 1);
+        $this->DockState();
         foreach (['TileDevice', 'WantedDevice', 'PendingFavorites', 'Players'] as $buffer) {
             $this->SetBuffer($buffer, '');
         }
@@ -499,5 +510,12 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     private function PushToTiles(array $Message): void
     {
         $this->UpdateVisualizationValue(json_encode($Message));
+        // Auch an den Player ohne Kachel (Browser-Erweiterung): neue Token und An-/Abmeldung
+        if (in_array($Message['type'] ?? '', ['token', 'auth'], true)) {
+            $this->SendToDevices($Message);
+            if (($Message['type'] ?? '') === 'auth' && ($Message['signedIn'] ?? false) === true) {
+                $this->SendToDevices(['type' => 'token', 'accessToken' => $this->AccessToken(false), 'expiresAt' => $this->ReadAttributeInteger('AccessExpiry')]);
+            }
+        }
     }
 }
