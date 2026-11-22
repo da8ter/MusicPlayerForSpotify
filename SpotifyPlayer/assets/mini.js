@@ -92,7 +92,8 @@
         + 'padding:8px 6px 8px 8px;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.35);color:#fff;-webkit-backdrop-filter:blur(14.4px) saturate(180%);backdrop-filter:blur(14.4px) saturate(180%);'
         + 'box-shadow:0 6px 24px rgba(0,0,0,.18),0 1px 2px rgba(0,0,0,.10);text-shadow:0 1px 2px rgba(0,0,0,.35);font:14px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:left .25s ease}'
         + '.smp.smp-on{display:flex}.smp.smp-drag{cursor:grabbing;transition:none}'
-        + '.smp.smp-min{width:auto;padding:6px 6px 6px 4px;border-left:0;border-radius:0 14px 14px 0}.smp.smp-min>:not(.smp-c){display:none}'
+        + '.smp.smp-min{width:auto;padding:6px 6px 6px 4px;border-left:0;border-radius:0 14px 14px 0}.smp.smp-min>:not(.smp-c):not(.smp-p):not(.smp-o){display:none}.smp-b.smp-o{display:none}'
+        + '.smp.smp-min .smp-p{position:absolute;left:10px;top:12px;background:rgba(0,0,0,.45)}.smp.smp-min .smp-o{display:flex;width:22px;margin-left:-4px;opacity:.75}'
         + '.smp-c{flex:0 0 48px;width:48px;height:48px;border-radius:8px;background:#3a3a3c center/cover no-repeat;cursor:pointer}'
         + '.smp-t{flex:1;min-width:0}.smp-t div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.smp-a{opacity:.72;font-size:13px;margin-top:2px}'
         + '.smp-b{flex:0 0 auto;width:36px;height:36px;border:0;border-radius:50%;background:none;color:inherit;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}'
@@ -115,6 +116,7 @@
       root.appendChild(text);
       root.appendChild(button(T('Previous'), 'backward-step', '⏮', function () { o.send('previous'); }));
       bPlay = button(T('Play'), 'play', '▶', function () { state.playing = !state.playing; paintPlay(); o.send('toggle'); });
+      bPlay.classList.add('smp-p');
       root.appendChild(bPlay);
       root.appendChild(button(T('Next'), 'forward-step', '⏭', function () { o.send('next'); }));
       var close = button(T('Close'), 'xmark', '×', function () { dismissed = trackKey(); show(); });
@@ -123,6 +125,9 @@
       var minimize = button(T('Minimize'), 'down-left-and-up-right-to-center', '–', function () { setSmall(true); });
       minimize.classList.add('smp-x');
       root.appendChild(minimize);
+      var expand = button(T('Expand'), 'chevron-right', '›', function () { setSmall(false); });
+      expand.classList.add('smp-o');
+      root.appendChild(expand);
       root.classList.toggle('smp-min', small);
       if (small) img.title = T('Expand');
       root.addEventListener('pointerdown', startDrag);
