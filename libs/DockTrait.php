@@ -56,7 +56,7 @@ trait MusicPlayerSpotifyDockTrait
     {
         $mini = $this->ReadPropertyBoolean('MiniPlayer');
         $texts = [];
-        foreach (['Previous', 'Play', 'Pause', 'Next', 'Close', 'Open player'] as $text) {
+        foreach (['Previous', 'Play', 'Pause', 'Next', 'Close', 'Minimize', 'Expand', 'Open player'] as $text) {
             $texts[$text] = $this->Translate($text);
         }
         $config = [

@@ -43,12 +43,22 @@
     var dismissed = '';  // Titel, für den der Nutzer den Mini-Player geschlossen hat
     var root = null, img = null, title = null, artist = null, bPlay = null, fa = null;
     var pos = load();
+    var small = false; // minimiert: nur das Cover, am linken Fensterrand
+    try { small = w.localStorage.getItem(KEY + '.min') === '1'; } catch (e) { /* ohne Speicher */ }
 
     function load() {
       try { var p = JSON.parse(w.localStorage.getItem(KEY + '.pos') || 'null'); if (p && typeof p.x === 'number' && typeof p.y === 'number') return p; } catch (e) { /* ohne Speicher */ }
       return { x: 0.5, y: 0.9 }; // Mitte des Kastens relativ zum Fenster: unten mittig
     }
     function save() { try { w.localStorage.setItem(KEY + '.pos', JSON.stringify(pos)); } catch (e) { /* ohne Speicher */ } }
+    function setSmall(on) {
+      small = on;
+      try { w.localStorage.setItem(KEY + '.min', on ? '1' : '0'); } catch (e) { /* ohne Speicher */ }
+      if (!root) return;
+      root.classList.toggle('smp-min', on);
+      img.title = T(on ? 'Expand' : 'Open player');
+      place();
+    }
     function trackKey() { return state.title + '\n' + state.artist; }
 
     function icon(name, fallback) {
@@ -80,8 +90,9 @@
       var style = d.createElement('style');
       style.textContent = '.smp{position:fixed;z-index:2147483001;display:none;align-items:center;gap:10px;box-sizing:border-box;width:min(340px,calc(100vw - 16px));'
         + 'padding:8px 6px 8px 8px;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.35);color:#fff;-webkit-backdrop-filter:blur(14.4px) saturate(180%);backdrop-filter:blur(14.4px) saturate(180%);'
-        + 'box-shadow:0 6px 24px rgba(0,0,0,.18),0 1px 2px rgba(0,0,0,.10);text-shadow:0 1px 2px rgba(0,0,0,.35);font:14px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}'
-        + '.smp.smp-on{display:flex}.smp.smp-drag{cursor:grabbing}'
+        + 'box-shadow:0 6px 24px rgba(0,0,0,.18),0 1px 2px rgba(0,0,0,.10);text-shadow:0 1px 2px rgba(0,0,0,.35);font:14px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;transition:left .25s ease}'
+        + '.smp.smp-on{display:flex}.smp.smp-drag{cursor:grabbing;transition:none}'
+        + '.smp.smp-min{width:auto;padding:6px 6px 6px 4px;border-left:0;border-radius:0 14px 14px 0}.smp.smp-min>:not(.smp-c){display:none}'
         + '.smp-c{flex:0 0 48px;width:48px;height:48px;border-radius:8px;background:#3a3a3c center/cover no-repeat;cursor:pointer}'
         + '.smp-t{flex:1;min-width:0}.smp-t div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.smp-a{opacity:.72;font-size:13px;margin-top:2px}'
         + '.smp-b{flex:0 0 auto;width:36px;height:36px;border:0;border-radius:50%;background:none;color:inherit;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}'
@@ -109,6 +120,11 @@
       var close = button(T('Close'), 'xmark', '×', function () { dismissed = trackKey(); show(); });
       close.classList.add('smp-x');
       root.appendChild(close);
+      var minimize = button(T('Minimize'), 'down-left-and-up-right-to-center', '–', function () { setSmall(true); });
+      minimize.classList.add('smp-x');
+      root.appendChild(minimize);
+      root.classList.toggle('smp-min', small);
+      if (small) img.title = T('Expand');
       root.addEventListener('pointerdown', startDrag);
       d.body.appendChild(root);
       icons(function (lib, css) {
@@ -141,11 +157,12 @@
     function place() {
       if (!root || !root.classList.contains('smp-on')) return;
       var W = w.innerWidth, H = w.innerHeight, bw = root.offsetWidth, bh = root.offsetHeight;
-      root.style.left = clamp(pos.x * W - bw / 2, 4, Math.max(4, W - bw - 4)) + 'px';
+      root.style.left = small ? '0px' : clamp(pos.x * W - bw / 2, 4, Math.max(4, W - bw - 4)) + 'px';
       root.style.top = clamp(pos.y * H - bh / 2, 4, Math.max(4, H - bh - 4)) + 'px';
     }
 
-    /* Verschieben; ohne nennenswerte Bewegung zählt es als Tipp (aufs Cover: zurück zur Kachel). */
+    /* Verschieben; ohne nennenswerte Bewegung zählt es als Tipp (aufs Cover: zurück zur Kachel, minimiert: aufklappen).
+       Minimiert bleibt er am linken Rand und lässt sich nur auf und ab schieben. */
     function startDrag(ev) {
       if (ev.button) return;
       ev.preventDefault();
@@ -157,9 +174,11 @@
         moved = true;
         root.classList.add('smp-drag');
         var W = w.innerWidth, H = w.innerHeight, bw = root.offsetWidth, bh = root.offsetHeight;
-        var x = clamp(left + dx, 4, Math.max(4, W - bw - 4)), y = clamp(top + dy, 4, Math.max(4, H - bh - 4));
-        root.style.left = x + 'px';
+        var y = clamp(top + dy, 4, Math.max(4, H - bh - 4));
         root.style.top = y + 'px';
+        if (small) { pos = { x: pos.x, y: (y + bh / 2) / H }; return; }
+        var x = clamp(left + dx, 4, Math.max(4, W - bw - 4));
+        root.style.left = x + 'px';
         pos = { x: (x + bw / 2) / W, y: (y + bh / 2) / H };
       }
       function up() {
@@ -168,6 +187,7 @@
         root.removeEventListener('pointercancel', up);
         root.classList.remove('smp-drag');
         if (moved) save();
+        else if (onCover && small) setSmall(false);
         else if (onCover) openTile();
       }
       root.addEventListener('pointermove', move);
