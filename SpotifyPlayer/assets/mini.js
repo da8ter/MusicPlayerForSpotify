@@ -9,7 +9,7 @@
   'use strict';
   if (window.SymconMiniPlayer) return;
   var w = window, d = document;
-  var HIDE_AFTER = 2500; // so lange nach dem letzten Lebenszeichen der Kachel gilt sie als sichtbar
+  var HIDE_AFTER = 2500; // so lange nach dem letzten Lebenszeichen der Kachel gilt sie als sichtbar (beim Verlassen meldet sie sich sofort ab)
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -130,6 +130,14 @@
       bPlay.innerHTML = icon(name, bPlay.dataset.fallback);
     }
 
+    function paint() {
+      title.textContent = state.title;
+      artist.textContent = state.artist;
+      img.style.backgroundImage = state.cover ? 'url("' + state.cover.replace(/["\\\n]/g, '') + '")' : '';
+      paintPlay();
+      place();
+    }
+
     function place() {
       if (!root || !root.classList.contains('smp-on')) return;
       var W = w.innerWidth, H = w.innerHeight, bw = root.offsetWidth, bh = root.offsetHeight;
@@ -179,14 +187,14 @@
       var tile = o.tile() || {};
       var tileVisible = tile.at && Date.now() - tile.at < HIDE_AFTER;
       var on = !!state.title && !tileVisible && dismissed !== trackKey();
-      if (on && !root) build();
+      if (on && !root) { build(); paint(); }
       if (!root) return;
       var was = root.classList.contains('smp-on');
       root.classList.toggle('smp-on', on);
       if (on && !was) place();
     }
 
-    w.setInterval(show, 1000);
+    w.setInterval(show, 300);
 
     return {
       update: function (s) {
@@ -200,12 +208,7 @@
         if (dismissed && dismissed !== trackKey()) dismissed = ''; // anderer Titel: wieder zeigen
         if (!state.title) dismissed = '';
         show();
-        if (!root) return;
-        title.textContent = state.title;
-        artist.textContent = state.artist;
-        img.style.backgroundImage = state.cover ? 'url("' + state.cover.replace(/["\\\n]/g, '') + '")' : '';
-        paintPlay();
-        place();
+        if (root) paint();
       },
     };
   };

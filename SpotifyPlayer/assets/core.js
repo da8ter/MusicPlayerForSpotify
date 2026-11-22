@@ -521,6 +521,9 @@
     };
     markTile();
     setInterval(markTile, 1000);
+    // Seite verlassen (Kachel verworfen): sofort abmelden, statt 2,5 s auf das ausbleibende Lebenszeichen zu warten.
+    // Eine weitere sichtbare Kachel derselben Instanz meldet sich binnen einer Sekunde wieder.
+    window.addEventListener('pagehide', () => { if (host) slot().tileAt = 0; });
     slot().token = web.token();
     // SDK-Player: im Hauptfenster gleich beim Laden (überlebt Kategoriewechsel); ohne Hauptfenster (Apps)
     // erst auf Wunsch, siehe ensureTilePlayer; ohne SDK nur Fernsteuerung
