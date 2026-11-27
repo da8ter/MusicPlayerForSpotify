@@ -66,7 +66,7 @@ Die Visu-Erweiterung besteht aus einer Browser-Erweiterung für Chrome und Edge 
 **Einrichten**
 
 1. Die Visu-Erweiterung nach ihrer [Anleitung](https://github.com/da8ter/VisuExtensionForSymcon#readme) installieren: das Symcon-Modul mit einer Instanz „Visu-Erweiterung“, die Browser-Erweiterung in Chrome oder Edge, und den Browser mit dem sechsstelligen Code koppeln.
-2. Im Formular der Instanz „Musikplayer für Spotify“ unten auf „An die Visu-Erweiterung andocken“ klicken. Der Player steht danach in deren Formular unter den angedockten Modulen. Die Visu-Erweiterung ist freiwillig: Ohne sie läuft der Player wie gewohnt in der Kachel.
+2. Im Formular der Instanz „Musikplayer für Spotify“ über „Gateway ändern“ die Instanz „Visu-Erweiterung“ wählen. Der Player steht danach in deren Formular unter den angedockten Modulen. Die Visu-Erweiterung ist freiwillig: Ohne sie läuft der Player wie gewohnt in der Kachel.
 3. Für den Mini-Player im Formular des Musikplayers „Mini-Player über der Visualisierung“ einschalten.
 4. Die Visualisierung im Browser neu laden.
 
