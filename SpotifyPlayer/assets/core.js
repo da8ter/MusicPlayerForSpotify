@@ -279,6 +279,13 @@
   async function perform(command, args) {
     const current = state();
     const useLocal = player && current.local && local;
+    // Eingeschränkte Geräte (Sonos): Spotify lehnt die Fernsteuerung ab (403); das Modul schickt diese Befehle direkt an den Lautsprecher
+    if (!useLocal && remote && remote.device && remote.device.is_restricted) {
+      const viaModule = { play: 2, pause: 3, next: 4, previous: 0 }, v = Math.max(0, Math.min(100, Math.round(Number(args && args.value) || 0)));
+      if (Object.prototype.hasOwnProperty.call(viaModule, command)) { action('Playback', viaModule[command]); return Promise.resolve(); }
+      if (command === 'seek') { action('Seek', Math.max(0, Math.round(args.value))); return Promise.resolve(); }
+      if (command === 'volume') { localVolume = v; remote.device.volume_percent = v; action('Volume', v); return Promise.resolve(); }
+    }
     switch (command) {
       case 'play':
         if (useLocal) return player.resume();

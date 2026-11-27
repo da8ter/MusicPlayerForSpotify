@@ -209,9 +209,19 @@ trait MusicPlayerSpotifyApiTrait
         // wenn keins aktiv ist (404 NO_ACTIVE_DEVICE). Ein gerade gewähltes Gerät geht vor.
         $device = $Command === 'transfer' ? (string) ($Args['device'] ?? '') : $this->WantedDevice();
         try {
+            // Sonos: Der letzte Befehl an dieses Gerät brauchte den Umweg über das Heimnetz, also gleich dorthin
+            if ($device === '' && $this->SonosRouted() && $this->SonosCommand($Command, $Args)) {
+                $this->SetTimerInterval('PollOnce', 1500);
+                return true;
+            }
             try {
                 $this->RunCommand($Command, $Args, $device);
             } catch (RuntimeException $e) {
+                // Eingeschränktes Gerät (403): Ist es ein Sonos-Raum im Heimnetz, nimmt der Lautsprecher den Befehl selbst an
+                if ($this->IsRestricted($e) && $this->SonosCommand($Command, $Args)) {
+                    $this->SetTimerInterval('PollOnce', 1500);
+                    return true;
+                }
                 if ($device !== '' || !str_starts_with($e->getMessage(), 'HTTP 404')) {
                     throw $e;
                 }
@@ -240,6 +250,7 @@ trait MusicPlayerSpotifyApiTrait
             case 'pause': $this->Api('PUT', '/v1/me/player/pause', $q); break;
             case 'next': $this->Api('POST', '/v1/me/player/next', $q); break;
             case 'previous': $this->Api('POST', '/v1/me/player/previous', $q); break;
+            case 'seek': $this->Api('PUT', '/v1/me/player/seek', $q + ['position_ms' => max(0, (int) ($Args['value'] ?? 0))]); break;
             case 'volume': $this->Api('PUT', '/v1/me/player/volume', $q + ['volume_percent' => max(0, min(100, (int) ($Args['value'] ?? 0)))]); break;
             case 'shuffle': $this->Api('PUT', '/v1/me/player/shuffle', $q + ['state' => ($Args['value'] ?? false) ? 'true' : 'false']); break;
             case 'repeat': $this->Api('PUT', '/v1/me/player/repeat', $q + ['state' => self::REPEAT_TO_SPOTIFY[(int) ($Args['value'] ?? 0)] ?? 'off']); break;

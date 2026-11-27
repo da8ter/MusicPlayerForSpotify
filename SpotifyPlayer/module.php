@@ -8,6 +8,7 @@ require_once __DIR__ . '/../libs/AuthTrait.php';
 require_once __DIR__ . '/../libs/ApiTrait.php';
 require_once __DIR__ . '/../libs/VariablesTrait.php';
 require_once __DIR__ . '/../libs/DockTrait.php';
+require_once __DIR__ . '/../libs/SonosTrait.php';
 
 /**
  * Musikplayer für Spotify als Kachel: das Web Playback SDK spielt im Browser (im Visu-Hauptfenster,
@@ -21,6 +22,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     use MusicPlayerSpotifyApiTrait;
     use MusicPlayerSpotifyVariablesTrait;
     use MusicPlayerSpotifyDockTrait;
+    use MusicPlayerSpotifySonosTrait;
 
     private const STATUS_NO_CONNECT = 201;
     private const STATUS_SIGNED_OUT = 202;
@@ -56,6 +58,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->RegisterPropertyInteger('PollInterval', 30);
         $this->RegisterPropertyString('Favorites', '[]');
         $this->RegisterPropertyBoolean('MiniPlayer', false);
+        $this->RegisterSonos();
 
         $this->RegisterAttributeString('RefreshSecret', '');
         $this->RegisterAttributeString('AccessSecret', '');
@@ -237,6 +240,10 @@ class MusicPlayerForSpotify extends IPSModuleStrict
                 return;
             case 'Volume':
                 $this->SetVolume((int) $Value);
+                return;
+            case 'Seek':
+                // Springen im Titel (Millisekunden); die Kachel nutzt es für Geräte, die Spotify nicht fernsteuern lässt
+                $this->SendCommand('seek', ['value' => max(0, (int) $Value)]);
                 return;
             case 'Shuffle':
                 $this->SetShuffle((bool) $Value);

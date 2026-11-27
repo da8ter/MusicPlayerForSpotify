@@ -144,7 +144,9 @@
             "Not connected to an instance \"Visu Extension\" (change gateway). With it, browsers are available as a playback device without opening the tile.": "Nicht mit einer Instanz „Visu-Erweiterung“ verbunden (Gateway ändern). Damit stehen Browser als Wiedergabegerät bereit, ohne dass die Kachel geöffnet wurde.",
             "Minimize": "Minimieren",
             "Expand": "Aufklappen",
-            "Open player": "Player öffnen"
+            "Open player": "Player öffnen",
+            "Address of a Sonos speaker (optional)": "Adresse eines Sonos-Lautsprechers (optional)",
+            "Spotify does not allow remote control of Sonos speakers. If Spotify plays on one, the instance sends play, pause, next, previous, seek and volume directly to the speaker in your network. Speakers are found automatically; enter an address only if that fails.": "Spotify lässt Sonos-Lautsprecher nicht fernsteuern. Spielt Spotify auf einem, schickt die Instanz Wiedergabe, Pause, Weiter, Zurück, Springen und Lautstärke direkt an den Lautsprecher in eurem Netz. Lautsprecher werden von selbst gefunden; eine Adresse nur eintragen, wenn das nicht klappt."
         }
     }
 }

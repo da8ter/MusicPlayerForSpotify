@@ -21,6 +21,15 @@
             "caption": "Without playback at most every 60 s. While a tile is open, it reports the state itself and the instance does not query."
         },
         {
+            "type": "ValidationTextBox",
+            "name": "SonosHost",
+            "caption": "Address of a Sonos speaker (optional)"
+        },
+        {
+            "type": "Label",
+            "caption": "Spotify does not allow remote control of Sonos speakers. If Spotify plays on one, the instance sends play, pause, next, previous, seek and volume directly to the speaker in your network. Speakers are found automatically; enter an address only if that fails."
+        },
+        {
             "type": "CheckBox",
             "name": "MiniPlayer",
             "caption": "Mini player on top of the visualization when the page with the tile is left (needs the Visu Extension)"
