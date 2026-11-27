@@ -73,6 +73,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->RegisterAttributeString('TileHash', '');
         $this->RegisterAttributeInteger('RateLimitUntil', 0);
         $this->RegisterAttributeInteger('RateLimitStep', 0);
+        $this->RegisterDockAttributes();
 
         $this->RegisterTimer('RefreshToken', 0, 'SPM_RefreshAccessToken($_IPS[\'TARGET\']);');
         $this->RegisterTimer('Poll', 0, 'SPM_PollState($_IPS[\'TARGET\']);');

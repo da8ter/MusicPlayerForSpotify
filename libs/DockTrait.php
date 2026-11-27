@@ -20,12 +20,27 @@ trait MusicPlayerSpotifyDockTrait
     private static string $DockRx = '{9E7FA1CF-55F3-418B-8C92-FF4BAAC93EFA}';
     /** Was ein Gerät auslösen darf: dieselben Wege wie die Kachel über requestAction. */
     private static array $DockEvents = ['State', 'Player', 'RefreshToken', 'Playback'];
+    /** So lange nach der Anlage gilt eine Abfrage als Teil des Anlege-Dialogs der Konsole (Sekunden). */
+    private static int $DockCreateWindow = 5;
 
     public function GetCompatibleParents(): string
     {
-        // Andocken ist freiwillig. Die Konsole meldet eine fehlende übergeordnete Instanz nur bei „moduleIDs“ und öffnet
-        // beim Anlegen ohne „type“ keinen Dialog; angedockt wird deshalb über den Knopf im Formular (DockFormItems).
-        return $this->Docked() ? (string) json_encode(['type' => 'connect', 'modules' => [['moduleID' => self::$VisuExtension]]]) : '{}';
+        // Andocken ist freiwillig. Die Konsole meldet eine fehlende übergeordnete Instanz nur bei „moduleIDs“, mit „modules“
+        // bietet „Gateway ändern“ die Visu-Erweiterung trotzdem an. Beim Anlegen fragt sie sofort hier nach und öffnet ohne
+        // „type“ keinen Dialog (Abbrechen dort löscht die neue Instanz): deshalb in den ersten Sekunden nach der Anlage '{}'.
+        if (!$this->Docked() && time() - $this->ReadAttributeInteger('CreatedAt') < self::$DockCreateWindow) {
+            return '{}';
+        }
+        return (string) json_encode(['type' => 'connect', 'modules' => [['moduleID' => self::$VisuExtension]]]);
+    }
+
+    /** In Create() aufrufen: merkt sich den Zeitpunkt der Anlage (einmalig, überlebt Neustart und Neuladen). */
+    protected function RegisterDockAttributes(): void
+    {
+        $this->RegisterAttributeInteger('CreatedAt', 0);
+        if ($this->ReadAttributeInteger('CreatedAt') === 0) {
+            $this->WriteAttributeInteger('CreatedAt', time());
+        }
     }
 
     /** Hinweis und Knopf fürs freiwillige Andocken an die (einzige) Instanz „Visu-Erweiterung“. */
