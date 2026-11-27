@@ -93,6 +93,10 @@ trait MusicPlayerSpotifySonosTargetTrait
             case 'release':
                 $this->SonosRelease(true);
                 return;
+            case 'list':
+                // Ansicht „Als Nächstes“: die Titel nach dem laufenden; Namen und Cover schlägt die Kachel bei Spotify nach
+                $this->PushToTiles(['type' => 'sonosQueue', 'ids' => $this->SonosQueueAfter($room['ip'])]);
+                return;
             default:
                 throw new InvalidArgumentException('Invalid Sonos request');
         }
@@ -242,6 +246,16 @@ trait MusicPlayerSpotifySonosTargetTrait
             }
         }
         return 0;
+    }
+
+    /** @return list<string> Kennungen der nächsten bis zu 50 Titel in der Warteschlange des Raums */
+    private function SonosQueueAfter(string $Ip): array
+    {
+        $current = max(0, (int) $this->SonosTag($this->SonosSoap($Ip, 'AVTransport', 'GetPositionInfo', ['InstanceID' => 0]), 'Track'));
+        $result = $this->SonosTag($this->SonosSoap($Ip, 'ContentDirectory', 'Browse', ['ObjectID' => 'Q:0', 'BrowseFlag' => 'BrowseDirectChildren', 'Filter' => 'res',
+            'StartingIndex' => $current, 'RequestedCount' => 50, 'SortCriteria' => '']), 'Result');
+        preg_match_all('/<res[^>]*>x-sonos-spotify:spotify%3atrack%3a([A-Za-z0-9]{22})[^<]*<\/res>/i', $result, $m);
+        return array_slice($m[1], 0, 50);
     }
 
     /** Zufall und Wiederholen: Sonos kennt dafür einen gemeinsamen Modus; null lässt den Teil, wie er ist. */

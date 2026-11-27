@@ -465,7 +465,7 @@
       }
       return;
     }
-    if (msg.type === 'sonos') { sonos.take(msg); emit('state'); report(false); return; }
+    if (msg.type === 'sonos' || msg.type === 'sonosQueue') { if (sonos.take(msg)) { emit('state'); report(false); } return; }
     if (msg.type === 'favorites' && Array.isArray(msg.favorites)) { cfg.favorites = msg.favorites; emit('favorites'); }
     if (msg.type === 'ghosts' && Array.isArray(msg.ids)) ghostWaiters.slice().forEach(done => done(msg.ids.filter(id => typeof id === 'string')));
   }
@@ -577,7 +577,7 @@
   window.AMP = {
     cfg, T, start, run, api, apiAll, call, clearCache, login, logout, state, artwork, debug,
     devices: listDevices,
-    sonosRooms: sonos.rooms,
+    sonosRooms: sonos.rooms, sonosQueue: sonos.queue,
     ghosts,
     onChange: fn => listeners.push(fn),
     notify: text => emit('notice', text),

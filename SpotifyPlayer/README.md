@@ -93,7 +93,7 @@ Die Visu-Erweiterung besteht aus einer Browser-Erweiterung für Chrome und Edge 
 
 - **Raum wählen:** Läuft gerade etwas, wandert es mit: Die Kachel hält es an und startet dieselbe Playlist oder dasselbe Album im Raum am laufenden Titel und an der laufenden Stelle. Danach spielt alles, was ihr in der Kachel startet, in diesem Raum.
 - **So spielt der Raum:** Der Lautsprecher holt die Musik über seinen eigenen Spotify-Dienst. Dafür muss Spotify in der Sonos-App eingerichtet sein. Die Warteschlange des Raums wird dabei ersetzt.
-- **Was anders ist:** Die Spotify-App zeigt diese Wiedergabe nicht als laufend an, und die Ansicht „Als Nächstes“ der Kachel zeigt weiter Spotifys eigene Warteschlange, nicht die des Raums. Ein Titel aus einer Liste nimmt bis zu 100 Titel der Liste mit, ein Künstler seine Top-Titel.
+- **Was anders ist:** Die Spotify-App zeigt diese Wiedergabe nicht als laufend an. „Als Nächstes“ zeigt die Warteschlange des Raums in ihrer Reihenfolge, bis zu 50 Titel; bei eingeschaltetem Zufall spielt der Lautsprecher in anderer Folge. Ein Titel aus einer Liste nimmt bis zu 100 Titel der Liste mit, ein Künstler seine Top-Titel.
 - **Zurück auf ein anderes Gerät:** Wählt ihr wieder ein Spotify-Gerät, hält der Raum an und das Gerät spielt an derselben Stelle weiter.
 - **Aus der Spotify-App gestartet:** Läuft Spotify schon auf einem Sonos, weil ihr es in der Spotify-App dorthin geschickt habt, zeigt die Kachel Titel und Gerät und steuert Wiedergabe, Pause, Weiter, Zurück, Springen und Lautstärke direkt am Lautsprecher.
 - **Finden:** Die Lautsprecher findet das Modul von selbst; klappt das nicht, tragt ihr in der Instanz die Adresse eines Sonos-Lautsprechers ein. Variablen, Mini-Player und Skriptbefehle wirken ebenfalls auf den gewählten Raum.

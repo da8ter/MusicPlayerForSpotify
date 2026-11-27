@@ -205,7 +205,12 @@
     head.appendChild(repeat);
     queueBusy = true;
     try {
-      const data = await AMP.call('GET', '/v1/me/player/queue');
+      // Sonos-Raum als Ziel: dessen Warteschlange (Kennungen vom Modul, Namen und Cover dazu von Spotify)
+      let data;
+      if (AMP.state().sonos) {
+        const ids = await AMP.sonosQueue();
+        data = { queue: ids.length ? (await AMP.api('/v1/tracks', { ids: ids.join(',') })).tracks || [] : [] };
+      } else data = await AMP.call('GET', '/v1/me/player/queue');
       const scroll = list.scrollTop;
       list.innerHTML = '';
       const now = AMP.state();

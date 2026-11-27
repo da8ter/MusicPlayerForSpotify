@@ -18,11 +18,30 @@
     const send = data => ctx.action('Sonos', JSON.stringify(data));
     const done = Promise.resolve('sonos');
 
+    // Warteschlange des Raums: Das Modul liest sie am Lautsprecher und antwortet per Nachricht „sonosQueue“
+    let waiters = [], queued = null;
+    function queue() {
+      const track = st ? st.trackId : '';
+      if (queued && queued.track === track && Date.now() - queued.at < 10000) return Promise.resolve(queued.ids);
+      return new Promise(resolve => {
+        const finish = ids => { clearTimeout(timer); waiters = waiters.filter(w => w !== finish); resolve(ids); };
+        const timer = setTimeout(() => finish(queued ? queued.ids : []), 2500);
+        if (!waiters.length) send({ c: 'list' });
+        waiters.push(finish);
+      });
+    }
+
+    /** Nachricht des Moduls; liefert true, wenn sich der Zustand geändert hat. */
     function take(msg) {
+      if (msg && msg.type === 'sonosQueue') {
+        queued = { ids: (Array.isArray(msg.ids) ? msg.ids : []).filter(id => ID.test(String(id))).slice(0, 50), track: st ? st.trackId : '', at: Date.now() };
+        waiters.slice().forEach(finish => finish(queued.ids));
+        return false;
+      }
       st = msg && msg.active && msg.room && typeof msg.room.id === 'string' ? msg : null;
       stAt = Date.now();
       const id = st && ID.test(String(st.trackId)) ? st.trackId : '';
-      if (!id || id === metaFor) return;
+      if (!id || id === metaFor) return true;
       metaFor = id;
       meta = null;
       ctx.api('/v1/tracks/' + id).then(t => {
@@ -30,6 +49,7 @@
         meta = { albumId: t.album ? t.album.id : '', images: t.album ? t.album.images : null };
         ctx.emit('state');
       }).catch(() => { /* ohne Cover */ });
+      return true;
     }
     take(base.state);
 
@@ -83,6 +103,7 @@
           case 'repeat': st.repeat = Number(args.value) || 0; send({ c: 'mode', repeat: st.repeat }); return done;
           case 'playItem':
             if (!ID.test(String(args.id))) return done;
+            queued = null;
             send({ c: 'play', type: args.type, id: args.id, index: Number.isInteger(args.index) ? args.index : 0, list: Array.isArray(args.list) ? args.list.slice(0, 100) : [] });
             return done;
           case 'playUris': {
@@ -92,6 +113,7 @@
           }
           case 'queue': {
             const m = /^spotify:track:([A-Za-z0-9]{22})$/.exec(String(args.uri));
+            queued = null;
             if (m) send({ c: 'queue', id: m[1] });
             return done;
           }
@@ -117,6 +139,6 @@
       return c.track ? { context_uri: 'spotify:' + c.type + ':' + c.id, offset: { uri: 'spotify:track:' + c.track }, position_ms: c.position } : { uris: ['spotify:track:' + c.id], position_ms: c.position };
     }
 
-    return { take, live, perform, release, rooms: () => rooms };
+    return { take, live, perform, release, queue, rooms: () => rooms };
   };
 })();
