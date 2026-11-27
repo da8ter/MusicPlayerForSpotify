@@ -173,9 +173,9 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         }
         unset($action);
         // Player ohne Kachel und Mini-Player laufen über die Instanz „Visu-Erweiterung“ (Browser-Erweiterung)
-        $form['actions'][] = ['type' => 'Label', 'caption' => $this->Translate($this->Docked()
-            ? 'Docked onto the Visu Extension: paired browsers are available as a playback device as soon as the visualization is loaded.'
-            : 'Not connected to an instance "Visu Extension" (change gateway). With it, browsers are available as a playback device without opening the tile.')];
+        $form['actions'] = array_merge($form['actions'], $this->DockFormItems(
+            'Docked onto the Visu Extension: paired browsers are available as a playback device as soon as the visualization is loaded.',
+            'Not docked onto the Visu Extension. With it, browsers are available as a playback device without opening the tile.'));
         return json_encode($form);
     }
 
@@ -240,6 +240,9 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     public function RequestAction(string $Ident, mixed $Value): void
     {
         switch ($Ident) {
+            case 'VisuDock':
+                $this->VisuDock((bool) $Value);
+                return;
             case 'Playback':
                 $command = self::PLAYBACK_COMMANDS[(int) $Value] ?? null;
                 if ($command !== null) {

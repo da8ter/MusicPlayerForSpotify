@@ -23,7 +23,55 @@ trait MusicPlayerSpotifyDockTrait
 
     public function GetCompatibleParents(): string
     {
-        return (string) json_encode(['type' => 'connect', 'moduleIDs' => [self::$VisuExtension]]);
+        // Andocken ist freiwillig. Die Konsole meldet eine fehlende übergeordnete Instanz nur bei „moduleIDs“ und öffnet
+        // beim Anlegen ohne „type“ keinen Dialog; angedockt wird deshalb über den Knopf im Formular (DockFormItems).
+        return $this->Docked() ? (string) json_encode(['type' => 'connect', 'modules' => [['moduleID' => self::$VisuExtension]]]) : '{}';
+    }
+
+    /** Hinweis und Knopf fürs freiwillige Andocken an die (einzige) Instanz „Visu-Erweiterung“. */
+    protected function DockFormItems(string $Docked, string $Undocked): array
+    {
+        if ($this->Docked()) {
+            return [
+                ['type' => 'Label', 'caption' => $this->Translate($Docked)],
+                ['type' => 'Button', 'caption' => $this->Translate('Undock from the Visu Extension'), 'onClick' => 'IPS_RequestAction($id, \'VisuDock\', false);'],
+            ];
+        }
+        if ($this->VisuExtensionID() === 0) {
+            return [
+                ['type' => 'Label', 'caption' => $this->Translate($Undocked)],
+                ['type' => 'Label', 'caption' => $this->Translate('The module "Visu Extension" is optional and not installed.')],
+            ];
+        }
+        return [
+            ['type' => 'Label', 'caption' => $this->Translate($Undocked)],
+            ['type' => 'Button', 'caption' => $this->Translate('Dock onto the Visu Extension'), 'onClick' => 'IPS_RequestAction($id, \'VisuDock\', true);'],
+        ];
+    }
+
+    /** Andocken oder lösen, auf Knopfdruck im Formular. */
+    protected function VisuDock(bool $Dock): void
+    {
+        if ($Dock) {
+            $extension = $this->VisuExtensionID();
+            if ($extension === 0) {
+                throw new \RuntimeException($this->Translate('The module "Visu Extension" is optional and not installed.'));
+            }
+            IPS_ConnectInstance($this->InstanceID, $extension);
+        } elseif ($this->Docked()) {
+            IPS_DisconnectInstance($this->InstanceID);
+        }
+        $this->ReloadForm();
+    }
+
+    /** Die aktive Instanz „Visu-Erweiterung“ (je Server eine: die mit der kleinsten Kennung), sonst 0. */
+    private function VisuExtensionID(): int
+    {
+        if (!IPS_ModuleExists(self::$VisuExtension)) {
+            return 0;
+        }
+        $instances = IPS_GetInstanceListByModuleID(self::$VisuExtension);
+        return $instances === [] ? 0 : min($instances);
     }
 
     public function ReceiveData(string $JSONString): string
