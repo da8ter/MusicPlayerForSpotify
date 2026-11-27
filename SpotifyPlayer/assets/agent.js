@@ -33,6 +33,8 @@
   }
   function send(ident, value) { if (ext) ext.send(C.instance, { a: ident, v: value }); }
   function tileVisible() { const s = w[SLOT]; return !!(s && s.tileAt && Date.now() - s.tileAt < 2500); }
+  // Seite der Kachel aus einem früheren Laden der Visualisierung (core.js merkt sie sich), falls sie seither nicht offen war
+  function storedPage() { try { return String(w.localStorage.getItem('symconSpotifyTilePage_' + C.instance) || ''); } catch (e) { return ''; } }
   function deviceName() {
     let stored = '';
     try { stored = String(w.localStorage.getItem(NAME_KEY) || '').trim(); } catch (e) { /* ohne Speicher */ }
@@ -119,7 +121,7 @@
     mini = w.SymconMiniPlayer({
       key: 'spotify.' + C.instance,
       texts: C.texts,
-      tile: () => { const s = w[SLOT] || {}; return { at: s.tileAt || 0, page: s.tilePage || '' }; },
+      tile: () => { const s = w[SLOT] || {}; return { at: s.tileAt || 0, page: s.tilePage || storedPage() }; },
       send: command => {
         const playing = !!(shown && shown.playing);
         send('Playback', command === 'previous' ? 0 : command === 'next' ? 4 : playing ? 3 : 2);

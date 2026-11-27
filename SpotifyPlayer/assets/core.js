@@ -517,7 +517,12 @@
       if (!host || document.visibilityState !== 'visible' || !window.innerWidth || !window.innerHeight) return;
       const s = slot();
       s.tileAt = Date.now();
-      try { s.tilePage = (win.location.pathname + win.location.hash).slice(0, 200); } catch (e) { /* egal */ }
+      try {
+        const page = (win.location.pathname + win.location.hash).slice(0, 200);
+        // Auch im Speicher des Browsers: Nach dem Neuladen der Visualisierung kennt der Mini-Player die Seite der Kachel sonst nicht
+        if (page !== s.tilePage) win.localStorage.setItem('symconSpotifyTilePage_' + cfg.instance, page);
+        s.tilePage = page;
+      } catch (e) { /* egal */ }
     };
     markTile();
     setInterval(markTile, 1000);
