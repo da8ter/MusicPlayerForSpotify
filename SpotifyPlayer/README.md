@@ -57,11 +57,31 @@ Im Browser (Mac, Windows, Android) und in den Symcon-Apps ist die Kachel selbst 
 
 ### Ohne die Kachel zu öffnen (Visu-Erweiterung)
 
-Mit der Browser-Erweiterung [Visu-Erweiterung für Symcon](https://github.com/da8ter/VisuExtensionForSymcon) geht mehr. Verbindet die Instanz dazu mit der Instanz „Visu-Erweiterung“ (in der Instanz „Gateway ändern“).
+![Musikplayer für Spotify — Mini-Player über der Visualisierung](https://raw.githubusercontent.com/da8ter/images/main/Visu-Erweiterung%20Mini-Player.png)
 
-- **Spotify-Connect-Gerät ohne Kachel:** Jeder dort gekoppelte Browser lädt den Player gleich beim Öffnen der Visualisierung, auch wenn die Player-Kachel noch nie angezeigt wurde. Auf welchen Geräten das geschieht, legt ihr in der Visu-Erweiterung fest („Welches Modul läuft auf welchem Gerät“).
-- **Mini-Player (optional):** Mit „Mini-Player über der Visualisierung“ erscheint ein kleiner Player mit Cover, Titel und Zurück / Wiedergabe / Weiter, sobald ihr die Seite mit der Kachel verlasst. Er lässt sich mit Finger oder Maus frei verschieben, der Browser merkt sich die Stelle. Ein Tipp aufs Cover führt zurück zur Kachel, das × blendet ihn bis zum nächsten Titel aus.
+Normalerweise wird ein Browser erst zum Spotify-Connect-Gerät, wenn die Player-Kachel einmal angezeigt wurde. Mit der [Visu-Erweiterung für Symcon](https://github.com/da8ter/VisuExtensionForSymcon) lädt der Player schon beim Öffnen der Visualisierung, auf jeder Seite, und auf Wunsch liegt ein kleiner Player über der Visualisierung.
+
+Die Visu-Erweiterung besteht aus einer Browser-Erweiterung für Chrome und Edge und einem eigenen Symcon-Modul. Sie läuft am Rechner oder Tablet mit Windows, macOS oder Linux, nicht in den Symcon-Apps, nicht auf iPhone und iPad und nicht in Chrome für Android.
+
+**Einrichten**
+
+1. Die Visu-Erweiterung nach ihrer [Anleitung](https://github.com/da8ter/VisuExtensionForSymcon#readme) installieren: das Symcon-Modul mit einer Instanz „Visu-Erweiterung“, die Browser-Erweiterung in Chrome oder Edge, und den Browser mit dem sechsstelligen Code koppeln.
+2. Im Formular der Instanz „Musikplayer für Spotify“ über „Gateway ändern“ die Instanz „Visu-Erweiterung“ wählen. Der Player steht danach in deren Formular unter den angedockten Modulen.
+3. Für den Mini-Player im Formular des Musikplayers „Mini-Player über der Visualisierung“ einschalten.
+4. Die Visualisierung im Browser neu laden.
+
+**Was sich damit ändert**
+
+- **Spotify-Connect-Gerät ohne Kachel:** Jeder gekoppelte Browser meldet sich beim Öffnen der Visualisierung als Gerät bei Spotify an, auch wenn die Player-Kachel noch nie angezeigt wurde. Du kannst die Wiedergabe also aus der Spotify-App, aus einem Skript oder einem Ablaufplan dorthin holen. Das Gerät heißt wie der Gerätename der Instanz plus der Name, den der Browser in der Visu-Erweiterung trägt, etwa „Symcon · Küche“.
+- **Welche Browser mitmachen:** Vorgabe ist jeder gekoppelte Browser. Sobald mehrere Module angedockt sind, legst du in der Visu-Erweiterung fest, welches Modul auf welchem Gerät läuft.
+- **Mini-Player:** Er erscheint, sobald du die Seite mit der Kachel verlässt und ein Titel geladen ist: Cover, Titel, Interpret und Zurück / Wiedergabe / Weiter. Er lässt sich mit Finger oder Maus frei verschieben, der Browser merkt sich die Stelle. Ein Tipp aufs Cover führt zurück zur Seite mit der Kachel. Das × blendet ihn aus, bis der nächste Titel beginnt.
+- **Minimieren:** Der Knopf rechts verkleinert den Mini-Player auf das Cover am linken Fensterrand, mit Wiedergabe / Pause darauf. Ein Tipp aufs Cover klappt ihn wieder auf. Auch das merkt sich der Browser.
+
+**Zu beachten**
+
+- **Sichere Adresse:** Auch hier spielt der Browser nur über https (die Connect-Adresse) oder `localhost`, nicht über `http://<IP>`.
 - **Erst einmal berühren:** Browser spielen Ton erst ab, nachdem jemand die Seite einmal berührt oder angeklickt hat. Danach lässt sich die Wiedergabe aus Symcon starten. Ein Kiosk-Chrome kann die Sperre mit dem Startschalter `--autoplay-policy=no-user-gesture-required` aufheben.
+- **Öffnest du die Visualisierung unter mehreren Adressen** (zu Hause und über Symcon Connect), koppelst du den Browser in der Visu-Erweiterung für jede Adresse einmal.
 
 ### Andere Geräte
 
@@ -77,7 +97,7 @@ Sie steuern immer das aktive Gerät; ohne aktives Gerät die Kachel im Browser o
 
 ## Einrichtung
 
-1. Bibliothek installieren: im **Module Store** den Kanal **Beta** wählen und genau nach **Music Player for Spotify** suchen. Alternativ über das **Module Control** mit `https://github.com/da8ter/MusicPlayerForSpotify.git`.
+1. Bibliothek installieren: im **Module Store** den Kanal **Beta** wählen und genau nach **Musikplayer für Spotify** suchen (in einer englischen Konsole **Music Player for Spotify**). Alternativ über das **Module Control** mit `https://github.com/da8ter/MusicPlayerForSpotify.git`.
 2. Instanz „Musikplayer für Spotify“ anlegen.
 3. Die Kachel öffnen und **Mit Spotify anmelden** (öffnet ein Fenster bei Spotify; Pop-ups erlauben). Alternativ im Instanzformular *Anmeldelink anzeigen* und den Link im Browser öffnen. Die Anmeldung gilt danach für alle Geräte der Instanz.
 4. Optional Favoriten anlegen: Name und ein `open.spotify.com`-Link (oder `spotify:`-URI) zu einer Playlist, einem Album, einem Titel oder einem Künstler (in Spotify über *Teilen → Link kopieren*).
