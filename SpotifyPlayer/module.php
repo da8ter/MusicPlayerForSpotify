@@ -139,6 +139,8 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         }
         $this->ScheduleRefresh();
         $this->SchedulePoll();
+        // Ein Sonos-Raum war das Ziel: seinen Zustand wieder lesen (PollSonos gibt ihn frei, wenn er anderes spielt)
+        $this->SetTimerInterval('SonosPoll', $this->SignedIn() && $this->ReadAttributeString('SonosTarget') !== '' ? 1000 : 0);
     }
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
@@ -499,7 +501,8 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         }
         $this->SetIfChanged('Playback', 1);
         $this->DockState();
-        foreach (['TileDevice', 'WantedDevice', 'PendingFavorites', 'Players', 'SonosTarget', 'SonosState', 'SonosRoute'] as $buffer) {
+        $this->WriteAttributeString('SonosTarget', '');
+        foreach (['TileDevice', 'WantedDevice', 'PendingFavorites', 'Players', 'SonosState', 'SonosRoute'] as $buffer) {
             $this->SetBuffer($buffer, '');
         }
     }

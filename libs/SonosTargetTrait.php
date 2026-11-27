@@ -26,13 +26,15 @@ trait MusicPlayerSpotifySonosTargetTrait
 
     private function RegisterSonosTarget(): void
     {
+        // Attribut statt Puffer: Der Raum spielt über einen Neustart oder ein Modul-Update hinweg weiter
+        $this->RegisterAttributeString('SonosTarget', '');
         $this->RegisterTimer('SonosPoll', 0, 'SPM_PollSonos($_IPS[\'TARGET\']);');
     }
 
     /** @return array{id: string, name: string, ip: string, zones: list<string>}|null der gewählte Raum */
     private function SonosTarget(): ?array
     {
-        $id = $this->GetBuffer('SonosTarget');
+        $id = $this->ReadAttributeString('SonosTarget');
         if ($id === '') {
             return null;
         }
@@ -66,7 +68,7 @@ trait MusicPlayerSpotifySonosTargetTrait
             if ($room === null) {
                 throw new InvalidArgumentException('Unknown Sonos room');
             }
-            $this->SetBuffer('SonosTarget', $room['id']);
+            $this->WriteAttributeString('SonosTarget', $room['id']);
             $this->SetBuffer('SonosState', '');
             $play = is_array($in['play'] ?? null) ? $in['play'] : null;
             if ($play !== null) {
@@ -127,7 +129,7 @@ trait MusicPlayerSpotifySonosTargetTrait
     private function SonosRelease(bool $Pause): void
     {
         $room = $this->SonosTarget();
-        $this->SetBuffer('SonosTarget', '');
+        $this->WriteAttributeString('SonosTarget', '');
         $this->SetBuffer('SonosState', '');
         $this->SetTimerInterval('SonosPoll', 0);
         if ($room !== null && $Pause) {
