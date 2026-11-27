@@ -164,5 +164,50 @@
   let fitRaf = 0;
   window.addEventListener('resize', () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fit); });
 
+  // ── Breite der Seitenleiste: Griff am rechten Rand ziehen, Doppelklick = Vorgabe; je Browser und Instanz ──
+  function sideResizer() {
+    const side = document.getElementById('sidebar');
+    if (!side) return;
+    const cfg = window.SPM_CONFIG || window.AMP_CONFIG || {};
+    // Apple kennt keine Instanz in den Startdaten (ein Slot je Fenster), dann gilt die Breite für alle Apple-Kacheln
+    const key = (window.SPM_CONFIG ? 'symconSpotifySideW_' : 'symconAppleMusicSideW_') + (cfg.instance || '');
+    const root = document.documentElement;
+    const clamp = w => Math.round(Math.max(180, Math.min(w, 400, root.clientWidth / 2)));
+    let raf = 0;
+    const apply = w => {
+      if (w) root.style.setProperty('--side-w', clamp(w) + 'px'); else root.style.removeProperty('--side-w');
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    };
+    let saved = 0;
+    try { saved = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) { /* ohne Speicher */ }
+    if (saved) apply(saved);
+    const grip = document.createElement('div');
+    grip.className = 'side-grip';
+    side.appendChild(grip);
+    grip.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      grip.setPointerCapture(e.pointerId);
+      grip.classList.add('drag');
+      const x0 = e.clientX, w0 = side.getBoundingClientRect().width;
+      const move = ev => apply(Math.max(1, w0 + ev.clientX - x0)); // 0 hiesse „Vorgabe“
+      const up = () => {
+        grip.classList.remove('drag');
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', up);
+        grip.removeEventListener('pointercancel', up);
+        try { localStorage.setItem(key, String(Math.round(side.getBoundingClientRect().width))); } catch (e2) { /* ohne Speicher */ }
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+      grip.addEventListener('pointercancel', up);
+    });
+    grip.addEventListener('dblclick', () => {
+      apply(0);
+      try { localStorage.removeItem(key); } catch (e) { /* ohne Speicher */ }
+    });
+  }
+  sideResizer();
+
   window.AMPNav = { render, fit, sidebar };
 })();
