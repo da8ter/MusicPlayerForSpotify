@@ -175,7 +175,8 @@
       try { root.setPointerCapture(ev.pointerId); } catch (e) { /* egal */ }
       function move(e) {
         var dx = e.clientX - startX, dy = e.clientY - startY;
-        if (!moved && Math.abs(dx) + Math.abs(dy) < 6) return;
+        // 12 px Spiel: Ein Finger verrutscht beim Tippen leicht, das soll kein Verschieben sein
+        if (!moved && dx * dx + dy * dy < 144) return;
         moved = true;
         root.classList.add('smp-drag');
         var W = w.innerWidth, H = w.innerHeight, bw = root.offsetWidth, bh = root.offsetHeight;
