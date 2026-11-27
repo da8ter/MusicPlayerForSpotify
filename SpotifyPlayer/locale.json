@@ -146,7 +146,7 @@
             "Expand": "Aufklappen",
             "Open player": "Player öffnen",
             "Address of a Sonos speaker (optional)": "Adresse eines Sonos-Lautsprechers (optional)",
-            "Spotify does not allow remote control of Sonos speakers. If Spotify plays on one, the instance sends play, pause, next, previous, seek and volume directly to the speaker in your network. Speakers are found automatically; enter an address only if that fails.": "Spotify lässt Sonos-Lautsprecher nicht fernsteuern. Spielt Spotify auf einem, schickt die Instanz Wiedergabe, Pause, Weiter, Zurück, Springen und Lautstärke direkt an den Lautsprecher in eurem Netz. Lautsprecher werden von selbst gefunden; eine Adresse nur eintragen, wenn das nicht klappt."
+            "Spotify neither lists Sonos speakers nor allows remote control of them. The tile therefore offers the Sonos rooms of your network itself and plays there through the speaker (Spotify must be set up in the Sonos app). Speakers are found automatically; enter an address only if that fails.": "Spotify nennt Sonos-Lautsprecher nicht und lässt sie nicht fernsteuern. Die Kachel bietet die Sonos-Räume eures Netzes deshalb selbst an und spielt dort über den Lautsprecher (Spotify muss in der Sonos-App eingerichtet sein). Lautsprecher werden von selbst gefunden; eine Adresse nur eintragen, wenn das nicht klappt."
         }
     }
 }

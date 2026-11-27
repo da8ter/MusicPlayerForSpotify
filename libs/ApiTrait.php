@@ -178,6 +178,14 @@ trait MusicPlayerSpotifyApiTrait
         $item = is_array($State['item'] ?? null) ? $State['item'] : [];
         $device = is_array($State['device'] ?? null) ? $State['device'] : [];
         $playing = ($State['is_playing'] ?? false) === true;
+        // Ein Sonos-Raum ist das Ziel: Dessen Wiedergabe kennt Spotify nicht, die Variablen kommen vom Lautsprecher.
+        // Spielt laut Spotify inzwischen ein anderes Gerät, gilt wieder das.
+        if ($this->SonosTarget() !== null) {
+            if (!$playing || ($device['is_restricted'] ?? false) === true) {
+                return;
+            }
+            $this->SonosRelease(false);
+        }
         $artists = array_map(static fn ($a): string => (string) ($a['name'] ?? ''), is_array($item['artists'] ?? null) ? $item['artists'] : []);
         $images = is_array($item['album']['images'] ?? null) ? $item['album']['images'] : (is_array($item['images'] ?? null) ? $item['images'] : []);
         $cover = (string) ($images[0]['url'] ?? '');
@@ -208,6 +216,25 @@ trait MusicPlayerSpotifyApiTrait
         // Ohne device_id nimmt Spotify das aktive Gerät; die Geräteliste kostet einen Abruf und kommt nur,
         // wenn keins aktiv ist (404 NO_ACTIVE_DEVICE). Ein gerade gewähltes Gerät geht vor.
         $device = $Command === 'transfer' ? (string) ($Args['device'] ?? '') : $this->WantedDevice();
+        $room = $this->SonosTarget();
+        if ($room !== null && $Command === 'transfer') {
+            // Die Wiedergabe geht auf ein Spotify-Gerät: der Sonos-Raum hört auf
+            $this->SonosRelease(true);
+        } elseif ($room !== null) {
+            try {
+                switch ($Command) {
+                    case 'shuffle': $this->SonosMode($room['ip'], (bool) ($Args['value'] ?? false), null); break;
+                    case 'repeat': $this->SonosMode($room['ip'], null, (int) ($Args['value'] ?? 0)); break;
+                    case 'playItem': $this->SonosStart($room, (string) $Args['type'], (string) $Args['id'], 0, [], 0, ''); break;
+                    default: $this->SonosCommand($Command, $Args);
+                }
+            } catch (\Throwable $e) {
+                $this->LogMessage($this->Translate('Spotify command failed') . ' (Sonos, ' . $Command . '): ' . $e->getMessage(), KL_WARNING);
+                return false;
+            }
+            $this->SetTimerInterval('SonosPoll', 700);
+            return true;
+        }
         try {
             // Sonos: Der letzte Befehl an dieses Gerät brauchte den Umweg über das Heimnetz, also gleich dorthin
             if ($device === '' && $this->SonosRouted() && $this->SonosCommand($Command, $Args)) {

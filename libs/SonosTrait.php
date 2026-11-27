@@ -16,6 +16,7 @@ trait MusicPlayerSpotifySonosTrait
         'AVTransport'       => '/MediaRenderer/AVTransport/Control',
         'RenderingControl'  => '/MediaRenderer/RenderingControl/Control',
         'ZoneGroupTopology' => '/ZoneGroupTopology/Control',
+        'ContentDirectory'  => '/MediaServer/ContentDirectory/Control',
     ];
     private const SONOS_COMMANDS = ['play', 'pause', 'next', 'previous', 'seek', 'volume'];
     private const SONOS_ROOMS_TTL = 3600;
@@ -43,6 +44,13 @@ trait MusicPlayerSpotifySonosTrait
             return false;
         }
         $device = (string) $this->GetValue('Device');
+        $target = $this->SonosTarget();
+        if ($target !== null) {
+            // Ein in der Kachel gewählter Raum ist das Ziel, gleich wie das Gerät bei Spotify heißt
+            $this->SonosRun($target['ip'], $Command, $Args);
+            $this->SetTimerInterval('SonosPoll', 700);
+            return true;
+        }
         $ip = $this->SonosRoomIp($device, false);
         if ($ip === '') {
             return false;
@@ -104,7 +112,7 @@ trait MusicPlayerSpotifySonosTrait
 
     /**
      * Bekannte Räume, eine Stunde gemerkt (ein Abruf je Suche, nur wenn ein Befehl den Umweg braucht).
-     * @return list<array{ip: string, zones: list<string>}>
+     * @return list<array{id: string, name: string, ip: string, zones: list<string>}>
      */
     private function SonosRooms(bool $Refresh): array
     {
@@ -157,7 +165,7 @@ trait MusicPlayerSpotifySonosTrait
 
     /**
      * Gruppenübersicht eines Lautsprechers: je Gruppe die Adresse des Führers und die Namen ihrer Räume.
-     * @return list<array{ip: string, zones: list<string>}>
+     * @return list<array{id: string, name: string, ip: string, zones: list<string>}>
      */
     private function SonosTopology(string $Ip): array
     {
@@ -167,17 +175,19 @@ trait MusicPlayerSpotifySonosTrait
         foreach ($doc === false ? [] : ($doc->xpath('//ZoneGroup') ?: []) as $group) {
             $coordinator = (string) $group['Coordinator'];
             $zones = [];
+            $names = [];
             $ip = '';
             foreach ($group->ZoneGroupMember as $member) {
                 if ((string) $member['Invisible'] !== '1' && (string) $member['ZoneName'] !== '') {
                     $zones[] = mb_strtolower(trim((string) $member['ZoneName']));
+                    $names[] = trim((string) $member['ZoneName']);
                 }
                 if ((string) $member['UUID'] === $coordinator) {
                     $ip = (string) parse_url((string) $member['Location'], PHP_URL_HOST);
                 }
             }
-            if ($zones !== [] && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && count($rooms) < 32) {
-                $rooms[] = ['ip' => $ip, 'zones' => array_values(array_unique($zones))];
+            if ($zones !== [] && preg_match('/^RINCON_[A-F0-9]{12,24}$/', $coordinator) && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && count($rooms) < 32) {
+                $rooms[] = ['id' => $coordinator, 'name' => mb_substr(implode(' + ', array_unique($names)), 0, 60), 'ip' => $ip, 'zones' => array_values(array_unique($zones))];
             }
         }
         return $rooms;

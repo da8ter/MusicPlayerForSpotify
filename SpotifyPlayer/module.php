@@ -9,6 +9,7 @@ require_once __DIR__ . '/../libs/ApiTrait.php';
 require_once __DIR__ . '/../libs/VariablesTrait.php';
 require_once __DIR__ . '/../libs/DockTrait.php';
 require_once __DIR__ . '/../libs/SonosTrait.php';
+require_once __DIR__ . '/../libs/SonosTargetTrait.php';
 
 /**
  * Musikplayer für Spotify als Kachel: das Web Playback SDK spielt im Browser (im Visu-Hauptfenster,
@@ -23,6 +24,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
     use MusicPlayerSpotifyVariablesTrait;
     use MusicPlayerSpotifyDockTrait;
     use MusicPlayerSpotifySonosTrait;
+    use MusicPlayerSpotifySonosTargetTrait;
 
     private const STATUS_NO_CONNECT = 201;
     private const STATUS_SIGNED_OUT = 202;
@@ -59,6 +61,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->RegisterPropertyString('Favorites', '[]');
         $this->RegisterPropertyBoolean('MiniPlayer', false);
         $this->RegisterSonos();
+        $this->RegisterSonosTarget();
 
         $this->RegisterAttributeString('RefreshSecret', '');
         $this->RegisterAttributeString('AccessSecret', '');
@@ -190,6 +193,8 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             'playerName'  => mb_substr(trim($this->ReadPropertyString('PlayerName')) ?: 'Symcon', 0, 60),
             'userId'      => $this->ReadAttributeString('UserID'),
             'favorites'   => $this->Favorites(),
+            // Sonos-Räume im Heimnetz als Wiedergabeziel (Spotify nennt sie nicht)
+            'sonos'       => $signedIn ? $this->SonosTileConfig() : ['rooms' => [], 'state' => null],
             'texts'       => $texts,
         ];
         $flags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
@@ -198,6 +203,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
             '/*CONFIG*/null' => json_encode($config, $flags),
             '/*WEBAPI*/'     => (string) file_get_contents(__DIR__ . '/assets/webapi.js'),
             '/*SDKHOST*/'    => (string) file_get_contents(__DIR__ . '/assets/sdkhost.js'),
+            '/*SONOS*/'      => (string) file_get_contents(__DIR__ . '/assets/sonos.js'),
             '/*CORE*/'       => (string) file_get_contents(__DIR__ . '/assets/core.js'),
             '/*ICONS*/'      => (string) file_get_contents(__DIR__ . '/assets/icons.js'),
             '/*NAV*/'        => (string) file_get_contents(__DIR__ . '/assets/nav.js'),
@@ -240,6 +246,10 @@ class MusicPlayerForSpotify extends IPSModuleStrict
                 return;
             case 'Volume':
                 $this->SetVolume((int) $Value);
+                return;
+            case 'Sonos':
+                // Sonos-Raum als Ziel wählen, Inhalte dort starten, Modus, Ziel aufgeben (JSON, in HandleSonos geprüft)
+                $this->HandleSonos((string) $Value);
                 return;
             case 'Seek':
                 // Springen im Titel (Millisekunden); die Kachel nutzt es für Geräte, die Spotify nicht fernsteuern lässt
@@ -473,6 +483,8 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         $this->SetIfChanged('Device', $text($state['device'] ?? '', 60));
         $this->DockState();
         $deviceId = $text($state['deviceId'] ?? '', 80);
+        // Für das Sonos-Ziel: Spielt laut Kachel ein Spotify-Gerät, hat der Raum die Wiedergabe abgegeben (PollSonos)
+        $this->SetBuffer('TileActive', $playing && $deviceId !== '' && !str_starts_with($deviceId, 'sonos:') ? (string) time() : '');
         // Das SDK-Gerät der Kachel: Rückfall für Befehle, wenn kein Gerät aktiv ist
         if (($state['local'] ?? false) === true && preg_match('/^[A-Za-z0-9_-]{1,80}$/', $deviceId)) {
             $this->SetBuffer('TileDevice', $deviceId);
@@ -487,7 +499,7 @@ class MusicPlayerForSpotify extends IPSModuleStrict
         }
         $this->SetIfChanged('Playback', 1);
         $this->DockState();
-        foreach (['TileDevice', 'WantedDevice', 'PendingFavorites', 'Players'] as $buffer) {
+        foreach (['TileDevice', 'WantedDevice', 'PendingFavorites', 'Players', 'SonosTarget', 'SonosState', 'SonosRoute'] as $buffer) {
             $this->SetBuffer($buffer, '');
         }
     }

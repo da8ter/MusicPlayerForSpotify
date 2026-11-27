@@ -27,7 +27,7 @@
         },
         {
             "type": "Label",
-            "caption": "Spotify does not allow remote control of Sonos speakers. If Spotify plays on one, the instance sends play, pause, next, previous, seek and volume directly to the speaker in your network. Speakers are found automatically; enter an address only if that fails."
+            "caption": "Spotify neither lists Sonos speakers nor allows remote control of them. The tile therefore offers the Sonos rooms of your network itself and plays there through the speaker (Spotify must be set up in the Sonos app). Speakers are found automatically; enter an address only if that fails."
         },
         {
             "type": "CheckBox",

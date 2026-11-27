@@ -57,6 +57,7 @@
   // Access-Token, Web API und Zwischenspeicher: webapi.js
   const web = window.AMPWebApi({ cfg, T, slot, win: () => win, action, debug, emit });
   const { call, api, apiAll, clearCache, requestToken, setToken } = web;
+  const sonos = window.AMPSonos({ cfg, action, call, api, emit });
 
   // ── SDK-Player im Player-Fenster ──
   function on(target, name, fn) {
@@ -163,7 +164,8 @@
     } catch (e) { /* bleibt leer */ }
   }
   function liveState() {
-    const s = slot();
+    const s = slot(), room = sonos.live(local, remote);
+    if (room) return room;
     if (local && local.track_window && local.track_window.current_track) {
       const t = local.track_window.current_track;
       return {
@@ -191,10 +193,7 @@
   // Mehrere Kacheln einer Instanz im selben Fenster teilen sich das Ergebnis (als Text im Slot, damit
   // das Hauptfenster keine Objekte einer verworfenen Kachel hält).
   const SHARED_POLL = 8000;
-  let polling = false;
-  let pollAgain = false;
-  let commandAt = 0;
-  let pollOkAt = 0;
+  let polling = false, pollAgain = false, commandAt = 0, pollOkAt = 0;
   async function poll() {
     if (document.visibilityState === 'hidden' || !web.token()) return;
     // Läuft schon eine Abfrage, nach ihr noch einmal fragen (sonst fällt der Nachlauf nach einem Befehl aus)
@@ -279,13 +278,8 @@
   async function perform(command, args) {
     const current = state();
     const useLocal = player && current.local && local;
-    // Eingeschränkte Geräte (Sonos): Spotify lehnt die Fernsteuerung ab (403); das Modul schickt diese Befehle direkt an den Lautsprecher
-    if (!useLocal && remote && remote.device && remote.device.is_restricted) {
-      const viaModule = { play: 2, pause: 3, next: 4, previous: 0 }, v = Math.max(0, Math.min(100, Math.round(Number(args && args.value) || 0)));
-      if (Object.prototype.hasOwnProperty.call(viaModule, command)) { action('Playback', viaModule[command]); return Promise.resolve(); }
-      if (command === 'seek') { action('Seek', Math.max(0, Math.round(args.value))); return Promise.resolve(); }
-      if (command === 'volume') { localVolume = v; remote.device.volume_percent = v; action('Volume', v); return Promise.resolve(); }
-    }
+    // Sonos als Ziel oder als eingeschränktes Connect-Gerät: Diese Befehle gehen über das Modul an den Lautsprecher (sonos.js)
+    const via = sonos.perform(command, args, current, useLocal, local, remote); if (via) return via;
     switch (command) {
       case 'play':
         if (useLocal) return player.resume();
@@ -331,6 +325,9 @@
         if (!id) { const e = new Error(T('Spotify could not be loaded')); e.status = 0; throw e; }
         if (id !== slot().deviceId) local = null;
         action('Device', id);
+        // Vom Sonos-Raum weg: dort aufhören und hier an derselben Stelle weiterspielen
+        const resume = sonos.release(current);
+        if (resume) { await call('PUT', '/v1/me/player/play', { device_id: id }, resume); return id; }
         // Eingeschlafene Echos meldet Spotify mit 404, bis sie aufwachen: bis zu dreimal nachsetzen
         for (let attempt = 0; ; attempt++) {
           try { await call('PUT', '/v1/me/player', {}, { device_ids: [id], play: args.play !== false }); break; } catch (e) {
@@ -392,6 +389,7 @@
       slot().remoteAt = 0;
       commandAt = Date.now();
       if (command === 'transfer') emit('state');
+      if (result === 'sonos') { emit('state'); return true; } // der Zustand kommt vom Modul, nicht von Spotify
       const check = (command === 'transfer' || !before.local) && confirmCheck(command, args || {}, before, result);
       if (check) confirm(check); else schedulePoll(command === 'volume' ? 1500 : 600);
       return true;
@@ -467,6 +465,7 @@
       }
       return;
     }
+    if (msg.type === 'sonos') { sonos.take(msg); emit('state'); report(false); return; }
     if (msg.type === 'favorites' && Array.isArray(msg.favorites)) { cfg.favorites = msg.favorites; emit('favorites'); }
     if (msg.type === 'ghosts' && Array.isArray(msg.ids)) ghostWaiters.slice().forEach(done => done(msg.ids.filter(id => typeof id === 'string')));
   }
@@ -578,6 +577,7 @@
   window.AMP = {
     cfg, T, start, run, api, apiAll, call, clearCache, login, logout, state, artwork, debug,
     devices: listDevices,
+    sonosRooms: sonos.rooms,
     ghosts,
     onChange: fn => listeners.push(fn),
     notify: text => emit('notice', text),

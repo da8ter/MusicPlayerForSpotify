@@ -239,13 +239,15 @@
     // Getrennte eigene Player (Geister) ausblenden, außer Spotify hält eins für aktiv
     const list = devices.filter(d => d && d.id && !d.is_restricted && (d.is_active || d.id === sdk || ghosts.indexOf(d.id) < 0));
     if (sdk && !list.some(d => d.id === sdk)) list.unshift({ id: sdk, name: T('This tile'), type: 'tile' });
+    // Sonos-Räume aus dem Heimnetz: Spotify nennt sie nicht, das Modul spielt dort über den Lautsprecher selbst
+    AMP.sonosRooms().forEach(r => list.push({ id: 'sonos:' + r.id, name: r.name, type: 'Speaker', sonos: true }));
     // Aktiv ist, was Spotify als aktiv meldet; nur wenn die Liste keins nennt, das Gerät des Zustands
     const listed = list.some(d => d.is_active);
     list.forEach(d => {
       const b = document.createElement('button');
-      const active = listed ? !!d.is_active : d.id === current.deviceId;
+      const active = current.sonos || !listed ? d.id === current.deviceId : !!d.is_active;
       b.className = 'sheet-item device' + (active ? ' active' : '');
-      b.innerHTML = svg(DEVICE_ICONS[d.type] || 'speaker') + '<span>' + esc(d.id === sdk ? T('This tile') : d.name) + (d.id === sdk && d.name && d.name !== T('This tile') ? '<small>' + esc(d.name) + '</small>' : '') + '</span>' + (active ? svg('check', 'check') : '');
+      b.innerHTML = svg(DEVICE_ICONS[d.type] || 'speaker') + '<span>' + esc(d.id === sdk ? T('This tile') : d.name) + (d.id === sdk && d.name && d.name !== T('This tile') ? '<small>' + esc(d.name) + '</small>' : '') + (d.sonos ? '<small>Sonos</small>' : '') + '</span>' + (active ? svg('check', 'check') : '');
       b.onclick = async () => {
         sheet.hidden = true;
         if (active) return;
